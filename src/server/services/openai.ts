@@ -34,15 +34,23 @@ export async function transcribeAudio(
   const uploadsDir = IS_VERCEL ? "/tmp/uploads" : join(process.cwd(), "uploads");
   const filePath = join(uploadsDir, audioKey);
   const fileBuffer = await readFile(filePath);
-  const file = new File([fileBuffer], "recording.webm", { type: "audio/webm" });
+  return transcribeAudioBuffer(fileBuffer, "recording.webm", "audio/webm", language);
+}
 
+export async function transcribeAudioBuffer(
+  buffer: Buffer,
+  filename: string,
+  contentType: string,
+  language?: string
+): Promise<TranscriptionResult> {
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+  const file = new File([arrayBuffer], filename, { type: contentType });
   const transcription = await getGroq().audio.transcriptions.create({
     file,
     model: "whisper-large-v3",
     language,
     response_format: "text",
   });
-
   return {
     text: transcription as unknown as string,
     language,

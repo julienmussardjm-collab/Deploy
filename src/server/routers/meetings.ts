@@ -5,9 +5,23 @@ import { meetings } from "../db/schema.js";
 import { eq, like, and, gte, lte, or, desc } from "drizzle-orm";
 import {
   transcribeAudio,
+  transcribeAudioBuffer,
   generateSummaryAndKeyPoints,
 } from "../services/openai.js";
+import { generateAudioKey, uploadAudioToS3 } from "../services/s3.js";
 import { TRPCError } from "@trpc/server";
+
+const MAX_FILE_SIZE = 16 * 1024 * 1024;
+const ALLOWED_CONTENT_TYPES = [
+  "audio/webm",
+  "audio/webm;codecs=opus",
+  "audio/ogg",
+  "audio/ogg;codecs=opus",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+];
 
 export const meetingsRouter = router({
   create: publicProcedure
@@ -103,6 +117,104 @@ export const meetingsRouter = router({
         offset: input.offset,
         with: { user: true },
       });
+    }),
+
+  uploadAndProcess: publicProcedure
+    .input(
+      z.object({
+        title: z.string().min(1, "Title is required").max(500),
+        recorderName: z.string().max(255).optional(),
+        userId: z.number().int().positive().optional(),
+        audioData: z.string().min(1, "Audio data is required"),
+        filename: z.string().min(1).max(255),
+        contentType: z.string().min(1),
+        language: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const normalizedContentType = input.contentType.toLowerCase().trim();
+      const isValid = ALLOWED_CONTENT_TYPES.some((t) =>
+        normalizedContentType.startsWith(t.split(";")[0])
+      );
+      if (!isValid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid content type: ${input.contentType}` });
+      }
+
+      let audioBuffer: Buffer;
+      try {
+        audioBuffer = Buffer.from(input.audioData, "base64");
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 audio data" });
+      }
+      if (audioBuffer.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Audio file is empty" });
+      }
+      if (audioBuffer.length > MAX_FILE_SIZE) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "File size exceeds 16MB limit" });
+      }
+
+      const audioKey = generateAudioKey(input.filename);
+      const IS_VERCEL = !!process.env.VERCEL;
+
+      // On local dev, write to disk so audio player works; skip on Vercel (ephemeral /tmp)
+      if (!IS_VERCEL) {
+        await uploadAudioToS3(audioBuffer, audioKey, input.contentType);
+      }
+
+      const audioUrl = `/uploads/${audioKey}`;
+
+      const [meeting] = await db
+        .insert(meetings)
+        .values({
+          title: input.title,
+          audioUrl,
+          audioKey,
+          recorderName: input.recorderName,
+          userId: input.userId,
+          status: "processing",
+        })
+        .returning();
+
+      if (!meeting) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create meeting" });
+      }
+
+      try {
+        const transcriptionResult = await transcribeAudioBuffer(
+          audioBuffer,
+          input.filename,
+          input.contentType,
+          input.language
+        );
+
+        const summaryResult = await generateSummaryAndKeyPoints(
+          transcriptionResult.text,
+          input.title
+        );
+
+        await db
+          .update(meetings)
+          .set({
+            transcription: transcriptionResult.text,
+            summary: summaryResult.summary,
+            keyPoints: summaryResult.keyPoints,
+            status: "done",
+            updatedAt: new Date(),
+          })
+          .where(eq(meetings.id, meeting.id));
+
+        return { id: meeting.id };
+      } catch (error) {
+        await db
+          .update(meetings)
+          .set({ status: "error", updatedAt: new Date() })
+          .where(eq(meetings.id, meeting.id));
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Processing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
     }),
 
   processAudio: publicProcedure

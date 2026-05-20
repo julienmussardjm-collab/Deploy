@@ -19,28 +19,18 @@ import {
 } from "@/client/components/ui/card";
 import { Progress } from "@/client/components/ui/progress";
 
-type UploadStep =
-  | "recording"
-  | "uploading"
-  | "creating"
-  | "processing"
-  | "done"
-  | "error";
+type UploadStep = "recording" | "processing" | "done" | "error";
 
 const STEP_LABELS: Record<UploadStep, string> = {
   recording: "Waiting for recording",
-  uploading: "Uploading audio to cloud...",
-  creating: "Saving meeting record...",
-  processing: "AI is processing your meeting...",
+  processing: "Uploading & processing your meeting...",
   done: "Done! Redirecting...",
   error: "An error occurred",
 };
 
 const STEP_PROGRESS: Record<UploadStep, number> = {
   recording: 0,
-  uploading: 25,
-  creating: 50,
-  processing: 75,
+  processing: 50,
   done: 100,
   error: 0,
 };
@@ -55,9 +45,7 @@ export default function Record() {
   const [recordingReady, setRecordingReady] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 
-  const uploadMutation = trpc.upload.uploadAudio.useMutation();
-  const createMutation = trpc.meetings.create.useMutation();
-  const processMutation = trpc.meetings.processAudio.useMutation();
+  const uploadAndProcessMutation = trpc.meetings.uploadAndProcess.useMutation();
 
   function handleAudioReady(blob: Blob, _duration: number) {
     setAudioBlob(blob);
@@ -84,8 +72,7 @@ export default function Record() {
     setErrorMessage("");
 
     try {
-      // Step 1: Upload audio
-      setStep("uploading");
+      setStep("processing");
       const mimeType = audioBlob.type || "audio/webm";
       const extension = mimeType.includes("ogg")
         ? "ogg"
@@ -94,7 +81,6 @@ export default function Record() {
         : "webm";
       const filename = `recording_${Date.now()}.${extension}`;
 
-      // Convert blob to base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       let binary = "";
@@ -105,38 +91,17 @@ export default function Record() {
       }
       const base64 = btoa(binary);
 
-      const uploadResult = await uploadMutation.mutateAsync({
+      const result = await uploadAndProcessMutation.mutateAsync({
+        title: title.trim(),
+        recorderName: recorderName.trim() || undefined,
         audioData: base64,
         filename,
         contentType: mimeType,
       });
 
-      // Step 2: Create meeting record
-      setStep("creating");
-      const meeting = await createMutation.mutateAsync({
-        title: title.trim(),
-        audioUrl: uploadResult.audioUrl,
-        audioKey: uploadResult.audioKey,
-        recorderName: recorderName.trim() || undefined,
-      });
-
-      // Step 3: Trigger AI processing (non-blocking - frontend will poll)
-      setStep("processing");
-      processMutation.mutate(
-        { meetingId: meeting.id },
-        {
-          onSettled: () => {
-            // Regardless of outcome, navigate to meeting detail page
-            // The detail page will show processing status and poll
-          },
-        }
-      );
-
-      // Navigate to meeting detail page immediately
-      // (it will show processing status and poll for completion)
       setStep("done");
       setTimeout(() => {
-        navigate(`/meeting/${meeting.id}`);
+        navigate(`/meeting/${result.id}`);
       }, 800);
     } catch (err) {
       setStep("error");
@@ -146,8 +111,7 @@ export default function Record() {
     }
   }
 
-  const isSubmitting =
-    step === "uploading" || step === "creating" || step === "processing";
+  const isSubmitting = step === "processing";
   const isComplete = step === "done";
 
   return (
