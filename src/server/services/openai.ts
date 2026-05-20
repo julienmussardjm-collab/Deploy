@@ -1,4 +1,4 @@
-import Groq from "groq-sdk";
+import Groq, { toFile } from "groq-sdk";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import * as dotenv from "dotenv";
@@ -34,7 +34,8 @@ export async function transcribeAudio(
   const uploadsDir = IS_VERCEL ? "/tmp/uploads" : join(process.cwd(), "uploads");
   const filePath = join(uploadsDir, audioKey);
   const fileBuffer = await readFile(filePath);
-  return transcribeAudioBuffer(fileBuffer, "recording.webm", "audio/webm", language);
+  const ext = audioKey.split(".").pop() ?? "webm";
+  return transcribeAudioBuffer(fileBuffer, `recording.${ext}`, `audio/${ext}`, language);
 }
 
 export async function transcribeAudioBuffer(
@@ -43,10 +44,7 @@ export async function transcribeAudioBuffer(
   contentType: string,
   language?: string
 ): Promise<TranscriptionResult> {
-  // Copy into a fresh ArrayBuffer so TypeScript knows it's not a SharedArrayBuffer
-  const ab = new ArrayBuffer(buffer.byteLength);
-  new Uint8Array(ab).set(buffer);
-  const file = new File([new Uint8Array(ab)], filename, { type: contentType });
+  const file = await toFile(buffer, filename, { type: contentType });
   const transcription = await getGroq().audio.transcriptions.create({
     file,
     model: "whisper-large-v3",
