@@ -43,8 +43,10 @@ export async function transcribeAudioBuffer(
   contentType: string,
   language?: string
 ): Promise<TranscriptionResult> {
-  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-  const file = new File([arrayBuffer], filename, { type: contentType });
+  // Copy into a fresh ArrayBuffer so TypeScript knows it's not a SharedArrayBuffer
+  const ab = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(ab).set(buffer);
+  const file = new File([new Uint8Array(ab)], filename, { type: contentType });
   const transcription = await getGroq().audio.transcriptions.create({
     file,
     model: "whisper-large-v3",
