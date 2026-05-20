@@ -132,20 +132,25 @@ export const meetingsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      console.log("[uploadAndProcess] start", { filename: input.filename, contentType: input.contentType, dataLen: input.audioData.length });
+
       const normalizedContentType = input.contentType.toLowerCase().trim();
       const isValid = ALLOWED_CONTENT_TYPES.some((t) =>
         normalizedContentType.startsWith(t.split(";")[0])
       );
       if (!isValid) {
+        console.error("[uploadAndProcess] invalid content type:", input.contentType);
         throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid content type: ${input.contentType}` });
       }
 
       let audioBuffer: Buffer;
       try {
         audioBuffer = Buffer.from(input.audioData, "base64");
-      } catch {
+      } catch (e) {
+        console.error("[uploadAndProcess] base64 decode error:", e);
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 audio data" });
       }
+      console.log("[uploadAndProcess] buffer size:", audioBuffer.length);
       if (audioBuffer.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Audio file is empty" });
       }
@@ -156,13 +161,13 @@ export const meetingsRouter = router({
       const audioKey = generateAudioKey(input.filename);
       const IS_VERCEL = !!process.env.VERCEL;
 
-      // On local dev, write to disk so audio player works; skip on Vercel (ephemeral /tmp)
       if (!IS_VERCEL) {
         await uploadAudioToS3(audioBuffer, audioKey, input.contentType);
       }
 
       const audioUrl = `/uploads/${audioKey}`;
 
+      console.log("[uploadAndProcess] inserting meeting into DB");
       const [meeting] = await db
         .insert(meetings)
         .values({
@@ -178,19 +183,23 @@ export const meetingsRouter = router({
       if (!meeting) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create meeting" });
       }
+      console.log("[uploadAndProcess] meeting created, id:", meeting.id);
 
       try {
+        console.log("[uploadAndProcess] starting transcription");
         const transcriptionResult = await transcribeAudioBuffer(
           audioBuffer,
           input.filename,
           input.contentType,
           input.language
         );
+        console.log("[uploadAndProcess] transcription done, length:", transcriptionResult.text.length);
 
         const summaryResult = await generateSummaryAndKeyPoints(
           transcriptionResult.text,
           input.title
         );
+        console.log("[uploadAndProcess] summary done");
 
         await db
           .update(meetings)
@@ -205,6 +214,7 @@ export const meetingsRouter = router({
 
         return { id: meeting.id };
       } catch (error) {
+        console.error("[uploadAndProcess] processing error:", error);
         await db
           .update(meetings)
           .set({ status: "error", updatedAt: new Date() })
