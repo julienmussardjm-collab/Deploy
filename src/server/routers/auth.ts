@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../trpc.js";
+import { router, publicProcedure } from "../trpc.js";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -25,7 +25,7 @@ export const authRouter = router({
     return user || null;
   }),
 
-  logout: publicProcedure.mutation(async ({ ctx }) => {
+  logout: publicProcedure.mutation(async () => {
     // The actual logout is handled by clearing the cookie on the client
     // We just return success
     return { success: true };
@@ -38,7 +38,7 @@ export const authRouter = router({
         state: z.string().optional(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       try {
         // Exchange code for token with OAuth server
         const tokenResponse = await fetch(`${OAUTH_SERVER_URL}/oauth/token`, {
