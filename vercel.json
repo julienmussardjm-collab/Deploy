@@ -1,0 +1,14 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist/client",
+  "functions": {
+    "api/server.ts": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    { "source": "/trpc/:path*", "destination": "/api/server" },
+    { "source": "/api/:path*", "destination": "/api/server" },
+    { "source": "/uploads/:path*", "destination": "/api/server" }
+  ]
+}

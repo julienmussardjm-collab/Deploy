@@ -5,7 +5,11 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const dbPath = process.env.DATABASE_URL || "./meeting_recorder.db";
+const IS_VERCEL = !!process.env.VERCEL;
+const dbPath = IS_VERCEL
+  ? "/tmp/meeting_recorder.db"
+  : (process.env.DATABASE_URL || "./meeting_recorder.db");
+
 const sqlite = new Database(dbPath);
 
 sqlite.pragma("journal_mode = WAL");
@@ -13,3 +17,4 @@ sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
 export { schema };
+export { sqlite };

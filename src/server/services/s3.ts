@@ -2,7 +2,8 @@ import { mkdir, writeFile, unlink, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { randomUUID } from "crypto";
 
-const UPLOADS_DIR = join(process.cwd(), "uploads");
+const IS_VERCEL = !!process.env.VERCEL;
+const UPLOADS_DIR = IS_VERCEL ? "/tmp/uploads" : join(process.cwd(), "uploads");
 
 async function ensureDir(dir: string) {
   await mkdir(dir, { recursive: true });
