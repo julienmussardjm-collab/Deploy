@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
-import fs from "fs/promises";
-import path from "path";
+import { readFile } from "fs/promises";
+import { join } from "path";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -23,8 +23,8 @@ export async function transcribeAudio(
   audioKey: string,
   language?: string
 ): Promise<TranscriptionResult> {
-  const filePath = path.join(process.cwd(), "uploads", audioKey);
-  const fileBuffer = await fs.readFile(filePath);
+  const filePath = join(process.cwd(), "uploads", audioKey);
+  const fileBuffer = await readFile(filePath);
   const file = new File([fileBuffer], "recording.webm", { type: "audio/webm" });
 
   const transcription = await groq.audio.transcriptions.create({

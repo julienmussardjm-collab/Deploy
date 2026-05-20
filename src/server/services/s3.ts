@@ -1,11 +1,11 @@
-import fs from "fs/promises";
-import path from "path";
-import crypto from "crypto";
+import { mkdir, writeFile, unlink, readFile } from "fs/promises";
+import { join, dirname } from "path";
+import { randomUUID } from "crypto";
 
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const UPLOADS_DIR = join(process.cwd(), "uploads");
 
 async function ensureDir(dir: string) {
-  await fs.mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
 }
 
 export async function uploadAudioToS3(
@@ -13,9 +13,9 @@ export async function uploadAudioToS3(
   key: string,
   _contentType: string
 ): Promise<{ audioUrl: string; audioKey: string; size: number }> {
-  const filePath = path.join(UPLOADS_DIR, key);
-  await ensureDir(path.dirname(filePath));
-  await fs.writeFile(filePath, audioBuffer);
+  const filePath = join(UPLOADS_DIR, key);
+  await ensureDir(dirname(filePath));
+  await writeFile(filePath, audioBuffer);
 
   return {
     audioUrl: `/uploads/${key}`,
@@ -30,7 +30,7 @@ export async function getSignedUrlForKey(key: string): Promise<string> {
 
 export async function deleteAudioFromS3(key: string): Promise<void> {
   try {
-    await fs.unlink(path.join(UPLOADS_DIR, key));
+    await unlink(join(UPLOADS_DIR, key));
   } catch {
     // ignore missing files
   }
@@ -38,11 +38,11 @@ export async function deleteAudioFromS3(key: string): Promise<void> {
 
 export function generateAudioKey(filename: string): string {
   const timestamp = Date.now();
-  const randomSuffix = crypto.randomUUID().substring(0, 8);
+  const randomSuffix = randomUUID().substring(0, 8);
   const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   return `audio/${timestamp}_${randomSuffix}_${sanitized}`;
 }
 
 export async function getAudioBuffer(key: string): Promise<Buffer> {
-  return fs.readFile(path.join(UPLOADS_DIR, key));
+  return readFile(join(UPLOADS_DIR, key));
 }
