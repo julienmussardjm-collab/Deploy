@@ -5,9 +5,16 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Lazy init — évite le crash au chargement si GROQ_API_KEY manque
+let _groq: Groq | null = null;
+function getGroq(): Groq {
+  if (!_groq) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error("GROQ_API_KEY environment variable is not set");
+    _groq = new Groq({ apiKey });
+  }
+  return _groq;
+}
 
 export interface TranscriptionResult {
   text: string;
@@ -23,11 +30,13 @@ export async function transcribeAudio(
   audioKey: string,
   language?: string
 ): Promise<TranscriptionResult> {
-  const filePath = join(process.cwd(), "uploads", audioKey);
+  const IS_VERCEL = !!process.env.VERCEL;
+  const uploadsDir = IS_VERCEL ? "/tmp/uploads" : join(process.cwd(), "uploads");
+  const filePath = join(uploadsDir, audioKey);
   const fileBuffer = await readFile(filePath);
   const file = new File([fileBuffer], "recording.webm", { type: "audio/webm" });
 
-  const transcription = await groq.audio.transcriptions.create({
+  const transcription = await getGroq().audio.transcriptions.create({
     file,
     model: "whisper-large-v3",
     language,
@@ -44,7 +53,7 @@ export async function generateSummaryAndKeyPoints(
   transcription: string,
   title: string
 ): Promise<SummaryResult> {
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     temperature: 0.3,
     max_tokens: 1024,
@@ -74,8 +83,5 @@ ${transcription}`,
     .replace(/```\s*$/i, "")
     .trim();
 
-  const parsed = JSON.parse(cleaned) as SummaryResult;
-  return parsed;
+  return JSON.parse(cleaned) as SummaryResult;
 }
-
-export { groq };
