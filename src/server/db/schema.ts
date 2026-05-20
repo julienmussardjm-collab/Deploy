@@ -1,40 +1,40 @@
-import {
-  mysqlTable,
-  int,
-  varchar,
-  text,
-  timestamp,
-  mysqlEnum,
-  json,
-} from "drizzle-orm/mysql-core";
+import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
-export const users = mysqlTable("users", {
-  id: int("id").primaryKey().autoincrement(),
-  openId: varchar("open_id", { length: 255 }).unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull(),
-  role: mysqlEnum("role", ["user", "admin"]).notNull().default("user"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("last_signed_in"),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  openId: text("open_id").unique(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  lastSignedIn: integer("last_signed_in", { mode: "timestamp" }),
 });
 
-export const meetings = mysqlTable("meetings", {
-  id: int("id").primaryKey().autoincrement(),
-  userId: int("user_id").references(() => users.id),
-  recorderName: varchar("recorder_name", { length: 255 }),
-  title: varchar("title", { length: 500 }).notNull(),
+export const meetings = sqliteTable("meetings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").references(() => users.id),
+  recorderName: text("recorder_name"),
+  title: text("title").notNull(),
   audioUrl: text("audio_url").notNull(),
-  audioKey: varchar("audio_key", { length: 500 }).notNull(),
+  audioKey: text("audio_key").notNull(),
   transcription: text("transcription"),
   summary: text("summary"),
-  keyPoints: json("key_points").$type<string[]>(),
-  status: mysqlEnum("status", ["pending", "processing", "done", "error"])
+  keyPoints: text("key_points", { mode: "json" }).$type<string[]>(),
+  status: text("status", { enum: ["pending", "processing", "done", "error"] })
     .notNull()
     .default("pending"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({

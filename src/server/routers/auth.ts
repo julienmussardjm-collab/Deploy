@@ -9,43 +9,33 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "development-secret-key-change-in-production";
-const OAUTH_SERVER_URL = process.env.OAUTH_SERVER_URL || "https://api.manus.im";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "development-secret-key-change-in-production";
+const OAUTH_SERVER_URL =
+  process.env.OAUTH_SERVER_URL || "https://api.manus.im";
 
 export const authRouter = router({
   me: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.userId) {
-      return null;
-    }
+    if (!ctx.userId) return null;
 
     const user = await db.query.users.findFirst({
       where: eq(users.id, ctx.userId),
     });
 
-    return user || null;
+    return user ?? null;
   }),
 
   logout: publicProcedure.mutation(async () => {
-    // The actual logout is handled by clearing the cookie on the client
-    // We just return success
     return { success: true };
   }),
 
   callback: publicProcedure
-    .input(
-      z.object({
-        code: z.string(),
-        state: z.string().optional(),
-      })
-    )
+    .input(z.object({ code: z.string(), state: z.string().optional() }))
     .mutation(async ({ input }) => {
       try {
-        // Exchange code for token with OAuth server
         const tokenResponse = await fetch(`${OAUTH_SERVER_URL}/oauth/token`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             code: input.code,
             app_id: process.env.VITE_APP_ID,
@@ -56,18 +46,13 @@ export const authRouter = router({
           throw new Error("Failed to exchange OAuth code for token");
         }
 
-        const tokenData = await tokenResponse.json() as {
+        const tokenData = (await tokenResponse.json()) as {
           access_token: string;
-          user: {
-            id: string;
-            name: string;
-            email: string;
-          };
+          user: { id: string; name: string; email: string };
         };
 
         const oauthUser = tokenData.user;
 
-        // Find or create user
         let user = await db.query.users.findFirst({
           where: eq(users.openId, oauthUser.id),
         });
@@ -82,16 +67,12 @@ export const authRouter = router({
               role: "user",
               lastSignedIn: new Date(),
             })
-            .$returningId();
-
-          user = await db.query.users.findFirst({
-            where: eq(users.id, newUser.id),
-          });
+            .returning();
+          user = newUser;
         } else {
-          // Update last signed in
           await db
             .update(users)
-            .set({ lastSignedIn: new Date() })
+            .set({ lastSignedIn: new Date(), updatedAt: new Date() })
             .where(eq(users.id, user.id));
         }
 
@@ -102,7 +83,6 @@ export const authRouter = router({
           });
         }
 
-        // Generate JWT
         const secret = new TextEncoder().encode(JWT_SECRET);
         const token = await new jose.SignJWT({ userId: user.id })
           .setProtectedHeader({ alg: "HS256" })
@@ -110,10 +90,7 @@ export const authRouter = router({
           .setExpirationTime("7d")
           .sign(secret);
 
-        return {
-          token,
-          user,
-        };
+        return { token, user };
       } catch (error) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -124,9 +101,7 @@ export const authRouter = router({
 
   getLoginUrl: publicProcedure.query(async () => {
     const appId = process.env.VITE_APP_ID;
-    if (!appId) {
-      return null;
-    }
+    if (!appId) return null;
 
     const loginUrl = `${OAUTH_SERVER_URL}/oauth/authorize?app_id=${appId}&response_type=code`;
     return { loginUrl };

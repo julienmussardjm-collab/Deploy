@@ -69,6 +69,10 @@ app.use(
   })
 );
 
+// Serve uploaded audio files
+const uploadsDir = path.join(__dirname, "../../../uploads");
+app.use("/uploads", express.static(uploadsDir));
+
 // Serve static files in production
 if (NODE_ENV === "production") {
   const clientDist = path.join(__dirname, "../../dist/client");

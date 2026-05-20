@@ -3,8 +3,10 @@ import { router, publicProcedure } from "../trpc.js";
 import { db } from "../db/index.js";
 import { meetings } from "../db/schema.js";
 import { eq, like, and, gte, lte, or, desc } from "drizzle-orm";
-import { transcribeAudio, generateSummaryAndKeyPoints } from "../services/openai.js";
-import { getSignedUrlForKey } from "../services/s3.js";
+import {
+  transcribeAudio,
+  generateSummaryAndKeyPoints,
+} from "../services/openai.js";
 import { TRPCError } from "@trpc/server";
 
 export const meetingsRouter = router({
@@ -12,14 +14,14 @@ export const meetingsRouter = router({
     .input(
       z.object({
         title: z.string().min(1, "Title is required").max(500),
-        audioUrl: z.string().url("Invalid audio URL"),
+        audioUrl: z.string().min(1, "Audio URL is required"),
         audioKey: z.string().min(1, "Audio key is required"),
         recorderName: z.string().max(255).optional(),
         userId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const [meeting] = await db
+      const [created] = await db
         .insert(meetings)
         .values({
           title: input.title,
@@ -29,11 +31,7 @@ export const meetingsRouter = router({
           userId: input.userId,
           status: "pending",
         })
-        .$returningId();
-
-      const created = await db.query.meetings.findFirst({
-        where: eq(meetings.id, meeting.id),
-      });
+        .returning();
 
       if (!created) {
         throw new TRPCError({
@@ -50,9 +48,7 @@ export const meetingsRouter = router({
     .query(async ({ input }) => {
       const meeting = await db.query.meetings.findFirst({
         where: eq(meetings.id, input.id),
-        with: {
-          user: true,
-        },
+        with: { user: true },
       });
 
       if (!meeting) {
@@ -60,16 +56,6 @@ export const meetingsRouter = router({
           code: "NOT_FOUND",
           message: `Meeting with ID ${input.id} not found`,
         });
-      }
-
-      // Refresh signed URL if meeting exists
-      if (meeting.audioKey) {
-        try {
-          const freshUrl = await getSignedUrlForKey(meeting.audioKey);
-          return { ...meeting, audioUrl: freshUrl };
-        } catch {
-          // Return meeting with existing URL if we can't refresh
-        }
       }
 
       return meeting;
@@ -110,17 +96,13 @@ export const meetingsRouter = router({
         conditions.push(eq(meetings.userId, input.userId));
       }
 
-      const result = await db.query.meetings.findMany({
+      return db.query.meetings.findMany({
         where: conditions.length > 0 ? and(...conditions) : undefined,
         orderBy: [desc(meetings.createdAt)],
         limit: input.limit,
         offset: input.offset,
-        with: {
-          user: true,
-        },
+        with: { user: true },
       });
-
-      return result;
     }),
 
   processAudio: publicProcedure
@@ -150,29 +132,22 @@ export const meetingsRouter = router({
         };
       }
 
-      // Update status to processing
       await db
         .update(meetings)
-        .set({ status: "processing" })
+        .set({ status: "processing", updatedAt: new Date() })
         .where(eq(meetings.id, input.meetingId));
 
       try {
-        // Get fresh signed URL for Whisper
-        const freshAudioUrl = await getSignedUrlForKey(meeting.audioKey);
-
-        // Transcribe audio with Whisper
         const transcriptionResult = await transcribeAudio(
-          freshAudioUrl,
+          meeting.audioKey,
           input.language
         );
 
-        // Generate summary and key points
         const summaryResult = await generateSummaryAndKeyPoints(
           transcriptionResult.text,
           meeting.title
         );
 
-        // Update meeting with results
         await db
           .update(meetings)
           .set({
@@ -180,6 +155,7 @@ export const meetingsRouter = router({
             summary: summaryResult.summary,
             keyPoints: summaryResult.keyPoints,
             status: "done",
+            updatedAt: new Date(),
           })
           .where(eq(meetings.id, input.meetingId));
 
@@ -189,10 +165,9 @@ export const meetingsRouter = router({
           keyPoints: summaryResult.keyPoints,
         };
       } catch (error) {
-        // Update status to error
         await db
           .update(meetings)
-          .set({ status: "error" })
+          .set({ status: "error", updatedAt: new Date() })
           .where(eq(meetings.id, input.meetingId));
 
         throw new TRPCError({

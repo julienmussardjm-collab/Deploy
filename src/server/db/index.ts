@@ -1,18 +1,15 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL;
+const dbPath = process.env.DATABASE_URL || "./meeting_recorder.db";
+const sqlite = new Database(dbPath);
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is required");
-}
+sqlite.pragma("journal_mode = WAL");
+sqlite.pragma("foreign_keys = ON");
 
-const pool = mysql.createPool(connectionString);
-
-export const db = drizzle(pool, { schema, mode: "default" });
-
+export const db = drizzle(sqlite, { schema });
 export { schema };

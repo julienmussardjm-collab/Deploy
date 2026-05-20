@@ -2,19 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../src/server/services/s3.js", () => ({
   uploadAudioToS3: vi.fn().mockResolvedValue({
-    audioUrl:
-      "https://test-bucket.s3.amazonaws.com/audio/test_123.webm?signed=true",
+    audioUrl: "/uploads/audio/test_123.webm",
     audioKey: "audio/test_123.webm",
     size: 2048,
   }),
-  generateAudioKey: vi
-    .fn()
-    .mockReturnValue("audio/test_123.webm"),
-  getSignedUrlForKey: vi
-    .fn()
-    .mockResolvedValue(
-      "https://test-bucket.s3.amazonaws.com/audio/test_123.webm?signed=true"
-    ),
+  generateAudioKey: vi.fn().mockReturnValue("audio/test_123.webm"),
+  getSignedUrlForKey: vi.fn().mockResolvedValue("/uploads/audio/test_123.webm"),
 }));
 
 vi.mock("../src/server/db/index.js", () => ({
@@ -26,17 +19,12 @@ import { uploadRouter } from "../src/server/routers/upload.js";
 import type { Context } from "../src/server/trpc.js";
 
 function createCaller() {
-  const ctx: Context = {
-    req: {} as never,
-    res: {} as never,
-  };
+  const ctx: Context = { req: {} as never, res: {} as never };
   return uploadRouter.createCaller(ctx);
 }
 
-// Helper: create a valid base64 webm audio blob (minimal fake data)
 function createFakeAudioBase64(sizeBytes = 1024): string {
-  const buffer = Buffer.alloc(sizeBytes, 0x42); // fill with 'B'
-  return buffer.toString("base64");
+  return Buffer.alloc(sizeBytes, 0x42).toString("base64");
 }
 
 describe("Upload Router", () => {
@@ -64,7 +52,7 @@ describe("Upload Router", () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.audioUrl).toContain("s3");
+      expect(result.audioUrl).toContain("uploads");
     });
 
     it("should accept audio/ogg content type", async () => {
@@ -90,18 +78,8 @@ describe("Upload Router", () => {
     });
 
     it("should reject file exceeding 16MB size limit", async () => {
-      const { uploadAudioToS3 } = await import("../src/server/services/s3.js");
-      // uploadAudioToS3 won't be called for oversized files
-      (uploadAudioToS3 as ReturnType<typeof vi.fn>).mockClear();
-
       const caller = createCaller();
-      // Create a base64 string that represents 17MB of data
-      // 17 * 1024 * 1024 bytes -> need base64 for that
-      // We can't actually allocate 17MB in test, so we'll mock the buffer check
-      // Instead, test with a large enough base64
-      const overSizeBuffer = Buffer.alloc(17 * 1024 * 1024);
-      const overSizeBase64 = overSizeBuffer.toString("base64");
-
+      const overSizeBase64 = Buffer.alloc(17 * 1024 * 1024).toString("base64");
       await expect(
         caller.uploadAudio({
           audioData: overSizeBase64,
@@ -122,20 +100,21 @@ describe("Upload Router", () => {
       ).rejects.toThrow();
     });
 
-    it("should reject empty buffer (zero-length audio)", async () => {
+    it("should resolve for minimal valid audio data", async () => {
       const caller = createCaller();
-      // Empty base64 string that decodes to 0 bytes
       await expect(
         caller.uploadAudio({
-          audioData: "AA==", // decodes to 1 byte but let's test with truly invalid
+          audioData: "AA==",
           filename: "recording.webm",
           contentType: "audio/webm",
         })
-      ).resolves.toBeDefined(); // 1 byte is technically valid, should pass
+      ).resolves.toBeDefined();
     });
 
-    it("should generate a unique S3 key for each upload", async () => {
-      const { generateAudioKey } = await import("../src/server/services/s3.js");
+    it("should generate a unique storage key for each upload", async () => {
+      const { generateAudioKey } = await import(
+        "../src/server/services/s3.js"
+      );
       const caller = createCaller();
 
       await caller.uploadAudio({
