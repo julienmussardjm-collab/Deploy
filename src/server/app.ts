@@ -21,7 +21,7 @@ export function createApp(dbReady?: Promise<void>) {
   // Toutes les requêtes attendent que la DB soit initialisée
   if (dbReady) {
     app.use((_req: Request, _res: Response, next: NextFunction) => {
-      dbReady.then(next).catch(next);
+      dbReady.then(() => next()).catch((err: unknown) => next(err));
     });
   }
 
@@ -87,6 +87,22 @@ export function createApp(dbReady?: Promise<void>) {
       res.sendFile(join(clientDist, "index.html"));
     });
   }
+
+  // Gestionnaire d'erreurs JSON — doit être en dernier, après toutes les routes
+  // Garantit que l'API ne renvoie jamais du HTML au client tRPC
+  app.use(
+    (
+      err: unknown,
+      _req: Request,
+      res: Response,
+      _next: NextFunction
+    ) => {
+      const message =
+        err instanceof Error ? err.message : "Internal server error";
+      console.error("[Express error handler]", err);
+      res.status(500).json({ error: message });
+    }
+  );
 
   return app;
 }

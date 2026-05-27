@@ -1,14 +1,80 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema.js";
 import * as dotenv from "dotenv";
+import { resolve } from "path";
 
 dotenv.config();
 
-// Turso (remote) en production, SQLite local pour le dev
-const url = process.env.TURSO_DATABASE_URL || "file:./meeting_recorder.db";
-const authToken = process.env.TURSO_AUTH_TOKEN;
+const IS_VERCEL = !!process.env.VERCEL;
 
-export const client = createClient({ url, authToken });
-export const db = drizzle(client, { schema });
+let _client: Client | null = null;
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+function createDbClient(): Client {
+  const envUrl = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (envUrl) {
+    console.log("[DB] connecting to Turso:", envUrl.slice(0, 60));
+    return createClient({ url: envUrl, authToken });
+  }
+
+  if (IS_VERCEL) {
+    // URL manquante sur Vercel → erreur claire (ne pas utiliser de fichier local)
+    throw new Error(
+      "TURSO_DATABASE_URL environment variable is required on Vercel. " +
+        "Add it in Vercel project settings → Environment Variables."
+    );
+  }
+
+  // Dev local : chemin absolu obligatoire pour @libsql/client (file:./... invalide)
+  const localPath = `file:${resolve("./meeting_recorder.db")}`;
+  console.log("[DB] using local SQLite:", localPath);
+  return createClient({ url: localPath });
+}
+
+/**
+ * Retourne le client libsql (lazy init).
+ * Lance une erreur si TURSO_DATABASE_URL manque sur Vercel.
+ * tRPC attrapera cette erreur et renverra un JSON 500.
+ */
+export function getClient(): Client {
+  if (!_client) {
+    _client = createDbClient();
+  }
+  return _client;
+}
+
+function getDb(): ReturnType<typeof drizzle<typeof schema>> {
+  if (!_db) {
+    _db = drizzle(getClient(), { schema });
+  }
+  return _db;
+}
+
+/**
+ * Proxy lazy pour `db` — le module se charge sans erreur même si l'URL est
+ * absente. L'erreur survient au premier accès à la DB, là où tRPC peut la
+ * capturer et renvoyer du JSON.
+ */
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop) {
+    const d = getDb();
+    const val = (d as any)[prop];
+    return typeof val === "function" ? val.bind(d) : val;
+  },
+});
+
+/**
+ * Proxy lazy pour `client` (utilisé par init.ts / migrate.ts).
+ */
+export const client = new Proxy({} as Client, {
+  get(_target, prop) {
+    const c = getClient();
+    const val = (c as any)[prop];
+    return typeof val === "function" ? val.bind(c) : val;
+  },
+});
+
 export { schema };
