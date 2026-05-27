@@ -30,4 +30,26 @@ export async function initDb(): Promise<void> {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )
   `);
+
+  console.log("[DB] tables ready");
+}
+
+// Module-level cached promise — shared across all requests on a warm instance.
+// On a cold start it is null, so the first request triggers init.
+let _initPromise: Promise<void> | null = null;
+
+/**
+ * Ensures the DB schema is initialised before the caller continues.
+ * Safe to call concurrently: all callers share the same promise.
+ * Resets on failure so the next request retries automatically.
+ */
+export function ensureDbInit(): Promise<void> {
+  if (!_initPromise) {
+    _initPromise = initDb().catch((err) => {
+      console.error("[DB] ensureDbInit failed:", err);
+      _initPromise = null; // allow retry on next request
+      throw err;
+    });
+  }
+  return _initPromise;
 }

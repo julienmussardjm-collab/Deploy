@@ -110,13 +110,21 @@ export const meetingsRouter = router({
         conditions.push(eq(meetings.userId, input.userId));
       }
 
-      return db.query.meetings.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        orderBy: [desc(meetings.createdAt)],
-        limit: input.limit,
-        offset: input.offset,
-        with: { user: true },
-      });
+      try {
+        return await db.query.meetings.findMany({
+          where: conditions.length > 0 ? and(...conditions) : undefined,
+          orderBy: [desc(meetings.createdAt)],
+          limit: input.limit,
+          offset: input.offset,
+          with: { user: true },
+        });
+      } catch (err) {
+        console.error("[meetings.list] DB query failed:", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err instanceof Error ? err.message : "DB query failed",
+        });
+      }
     }),
 
   uploadAndProcess: publicProcedure
