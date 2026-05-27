@@ -12,8 +12,9 @@ let _client: Client | null = null;
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 function createDbClient(): Client {
-  const envUrl = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+  // .trim() évite les espaces / sauts de ligne copiés-collés depuis un terminal
+  const envUrl = process.env.TURSO_DATABASE_URL?.trim();
+  const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
 
   if (envUrl) {
     // Sur Vercel (serverless), forcer HTTPS au lieu de libsql:// (WebSocket).
@@ -22,8 +23,15 @@ function createDbClient(): Client {
     const url = IS_VERCEL
       ? envUrl.replace(/^libsql:\/\//, "https://")
       : envUrl;
-    console.log("[DB] connecting:", url.slice(0, 60));
-    return createClient({ url, authToken });
+    console.log("[DB] connecting:", url.slice(0, 80));
+    try {
+      const c = createClient({ url, authToken });
+      console.log("[DB] client created OK");
+      return c;
+    } catch (err) {
+      console.error("[DB] createClient failed:", err);
+      throw err;
+    }
   }
 
   if (IS_VERCEL) {
