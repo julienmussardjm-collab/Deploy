@@ -35,10 +35,28 @@ const STEP_PROGRESS: Record<UploadStep, number> = {
   error: 0,
 };
 
+const LANGUAGES = [
+  { code: "fr", label: "Français" },
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "pt", label: "Português" },
+  { code: "nl", label: "Nederlands" },
+  { code: "pl", label: "Polski" },
+  { code: "auto", label: "Auto-detect" },
+];
+
+function detectBrowserLanguage(): string {
+  const lang = navigator.language?.split("-")[0] ?? "fr";
+  return LANGUAGES.some((l) => l.code === lang) ? lang : "fr";
+}
+
 export default function Record() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [recorderName, setRecorderName] = useState("");
+  const [language, setLanguage] = useState<string>(detectBrowserLanguage);
   const [titleError, setTitleError] = useState("");
   const [step, setStep] = useState<UploadStep>("recording");
   const [errorMessage, setErrorMessage] = useState("");
@@ -101,6 +119,7 @@ export default function Record() {
         audioData: base64,
         filename,
         contentType: mimeType,
+        language: language === "auto" ? undefined : language,
       });
 
       setStep("done");
@@ -191,6 +210,25 @@ export default function Record() {
               <p className="mt-1.5 text-xs text-slate-500">
                 No login required — just enter your name if you'd like to
                 attribute this recording.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Spoken language
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                disabled={isSubmitting || isComplete}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Specifying the language significantly improves transcription accuracy.
               </p>
             </div>
           </CardContent>

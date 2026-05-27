@@ -145,8 +145,9 @@ export default function AudioRecorder({
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          channelCount: 1,       // mono — sufficient for speech, halves file size
-          sampleRate: 16000,     // Whisper is optimised for 16 kHz
+          channelCount: 1, // mono — sufficient for speech, halves file size
+          // No sampleRate hint: let the browser use hardware native rate.
+          // Forcing 16 kHz can cause resampling artefacts on some devices.
         },
       });
 

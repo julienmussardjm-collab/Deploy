@@ -37,6 +37,13 @@ export async function transcribeAudioBuffer(
   form.append("model", "whisper-large-v3");
   form.append("response_format", "text");
   if (language) form.append("language", language);
+  // A prompt helps Whisper with domain vocabulary and avoids language confusion.
+  form.append(
+    "prompt",
+    language === "fr"
+      ? "Réunion professionnelle, discussion d'équipe, points d'action."
+      : "Professional meeting, team discussion, action items."
+  );
 
   const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
