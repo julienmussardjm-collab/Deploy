@@ -16,8 +16,14 @@ function createDbClient(): Client {
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
   if (envUrl) {
-    console.log("[DB] connecting to Turso:", envUrl.slice(0, 60));
-    return createClient({ url: envUrl, authToken });
+    // Sur Vercel (serverless), forcer HTTPS au lieu de libsql:// (WebSocket).
+    // libsql:// utilise wss:// qui peut bloquer indéfiniment dans les fonctions
+    // serverless qui ne maintiennent pas de connexions WebSocket persistantes.
+    const url = IS_VERCEL
+      ? envUrl.replace(/^libsql:\/\//, "https://")
+      : envUrl;
+    console.log("[DB] connecting:", url.slice(0, 60));
+    return createClient({ url, authToken });
   }
 
   if (IS_VERCEL) {
