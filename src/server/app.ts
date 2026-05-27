@@ -15,8 +15,15 @@ const __dirname = dirname(__filename);
 const NODE_ENV = process.env.NODE_ENV || "development";
 const IS_VERCEL = !!process.env.VERCEL;
 
-export function createApp() {
+export function createApp(dbReady?: Promise<void>) {
   const app = express();
+
+  // Toutes les requêtes attendent que la DB soit initialisée
+  if (dbReady) {
+    app.use((_req: Request, _res: Response, next: NextFunction) => {
+      dbReady.then(next).catch(next);
+    });
+  }
 
   app.use(
     cors({

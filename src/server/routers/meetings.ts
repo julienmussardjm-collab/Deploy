@@ -159,13 +159,10 @@ export const meetingsRouter = router({
       }
 
       const audioKey = generateAudioKey(input.filename);
-      const IS_VERCEL = !!process.env.VERCEL;
 
-      if (!IS_VERCEL) {
-        await uploadAudioToS3(audioBuffer, audioKey, input.contentType);
-      }
-
-      const audioUrl = `/uploads/${audioKey}`;
+      // Upload vers R2 (ou disque local si R2 non configuré)
+      await uploadAudioToS3(audioBuffer, audioKey, input.contentType);
+      const audioUrl = audioKey;
 
       console.log("[uploadAndProcess] inserting meeting into DB");
       const [meeting] = await db
