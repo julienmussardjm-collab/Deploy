@@ -160,7 +160,8 @@ export const meetingsRouter = router({
 
       const audioKey = generateAudioKey(input.filename);
 
-      // Upload vers R2 (ou disque local si R2 non configuré)
+      // Sur Vercel l'audio est traité depuis le buffer (pas de stockage fichier)
+      // En dev local on sauvegarde sur disque pour la lecture
       await uploadAudioToS3(audioBuffer, audioKey, input.contentType);
       const audioUrl = audioKey;
 
