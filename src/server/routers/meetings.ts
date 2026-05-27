@@ -220,15 +220,26 @@ export const meetingsRouter = router({
 
         return { id: meeting.id };
       } catch (error) {
-        console.error("[uploadAndProcess] processing error:", error);
-        await db
-          .update(meetings)
-          .set({ status: "error", updatedAt: new Date() })
-          .where(eq(meetings.id, meeting.id));
+        const errName = error instanceof Error ? error.constructor.name : typeof error;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const errStatus = (error as any)?.status;
+        const errCause = (error as any)?.cause;
+        console.error(
+          `[uploadAndProcess] processing error [${errName}] status=${errStatus ?? "n/a"} cause=${errCause?.message ?? errCause ?? "n/a"}: ${errMsg}`
+        );
+
+        try {
+          await db
+            .update(meetings)
+            .set({ status: "error", updatedAt: new Date() })
+            .where(eq(meetings.id, meeting.id));
+        } catch (dbErr) {
+          console.error("[uploadAndProcess] failed to update meeting status:", dbErr);
+        }
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Processing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: `Processing failed: ${errMsg}`,
         });
       }
     }),

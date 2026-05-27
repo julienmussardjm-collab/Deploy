@@ -1,17 +1,29 @@
 import Groq, { toFile } from "groq-sdk";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import { Agent } from "https";
 import * as dotenv from "dotenv";
 
 dotenv.config();
+
+// Vercel serverless: use a fresh HTTPS agent per Groq instance (no keep-alive).
+// The groq-sdk default uses agentkeepalive whose pooled connections become stale
+// between Lambda invocations, causing ECONNRESET → APIConnectionError.
+const httpAgent = new Agent({ keepAlive: false });
 
 // Lazy init — évite le crash au chargement si GROQ_API_KEY manque
 let _groq: Groq | null = null;
 function getGroq(): Groq {
   if (!_groq) {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY?.trim();
     if (!apiKey) throw new Error("GROQ_API_KEY environment variable is not set");
-    _groq = new Groq({ apiKey });
+    _groq = new Groq({
+      apiKey,
+      httpAgent,
+      // Stay comfortably under Vercel Hobby's 60s function limit.
+      // APIConnectionTimeoutError gives a clearer message than a gateway kill.
+      timeout: 55_000,
+    });
   }
   return _groq;
 }
