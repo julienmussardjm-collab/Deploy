@@ -145,6 +145,8 @@ export default function AudioRecorder({
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          channelCount: 1,       // mono — sufficient for speech, halves file size
+          sampleRate: 16000,     // Whisper is optimised for 16 kHz
         },
       });
 
@@ -173,7 +175,12 @@ export default function AudioRecorder({
         CANDIDATE_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ??
         "";
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // 128 kbps is a big improvement over browser defaults (often 24-48 kbps).
+      // Better fidelity → Whisper transcribes more accurately.
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128_000,
+      });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
