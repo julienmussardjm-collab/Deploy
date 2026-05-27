@@ -3,7 +3,8 @@
   "outputDirectory": "dist/client",
   "functions": {
     "api/server.ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "bodySizeLimit": "25mb"
     }
   },
   "rewrites": [

@@ -159,14 +159,19 @@ export default function AudioRecorder({
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Determine best supported MIME type
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
-        ? "audio/ogg;codecs=opus"
-        : "audio/mp4";
+      // Determine best supported MIME type for recording.
+      // audio/mp4 is a *container* format; browsers don't support recording to it.
+      // The correct cross-browser fallback chain is webm → ogg → wav.
+      const CANDIDATE_TYPES = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+        "audio/wav",
+      ];
+      const mimeType =
+        CANDIDATE_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ??
+        "";
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;

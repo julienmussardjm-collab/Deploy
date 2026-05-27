@@ -76,20 +76,24 @@ export default function Record() {
       const mimeType = audioBlob.type || "audio/webm";
       const extension = mimeType.includes("ogg")
         ? "ogg"
-        : mimeType.includes("mp4")
-        ? "mp4"
+        : mimeType.includes("wav")
+        ? "wav"
         : "webm";
       const filename = `recording_${Date.now()}.${extension}`;
 
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = "";
-      const chunkSize = 8192;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, i + chunkSize);
-        binary += String.fromCharCode(...chunk);
-      }
-      const base64 = btoa(binary);
+      // Use FileReader to safely convert Blob → base64 without
+      // hitting the call-stack limit that String.fromCharCode(...chunk) can
+      // trigger on large recordings (>8 MB).
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // result is "data:<mime>;base64,<data>" — strip the prefix
+          const dataUrl = reader.result as string;
+          resolve(dataUrl.split(",")[1]);
+        };
+        reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+        reader.readAsDataURL(audioBlob);
+      });
 
       const result = await uploadAndProcessMutation.mutateAsync({
         title: title.trim(),

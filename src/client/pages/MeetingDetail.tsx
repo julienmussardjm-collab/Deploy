@@ -350,7 +350,16 @@ export default function MeetingDetail() {
       )}
 
       {/* Key Points */}
-      {meeting.keyPoints && Array.isArray(meeting.keyPoints) && meeting.keyPoints.length > 0 && (
+      {(() => {
+        // keyPoints is stored as JSON text in SQLite; Drizzle parses it but
+        // guard against it coming back as a raw string just in case.
+        let kp: string[] = [];
+        if (Array.isArray(meeting.keyPoints)) {
+          kp = meeting.keyPoints as string[];
+        } else if (typeof meeting.keyPoints === "string") {
+          try { kp = JSON.parse(meeting.keyPoints); } catch { kp = []; }
+        }
+        return kp.length > 0 ? (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -360,7 +369,7 @@ export default function MeetingDetail() {
           </CardHeader>
           <CardContent>
             <ol className="space-y-2">
-              {(meeting.keyPoints as string[]).map((point, i) => (
+              {kp.map((point, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-bold mt-0.5">
                     {i + 1}
@@ -371,7 +380,8 @@ export default function MeetingDetail() {
             </ol>
           </CardContent>
         </Card>
-      )}
+        ) : null;
+      })()}
 
       {/* Transcription */}
       {meeting.transcription ? (
