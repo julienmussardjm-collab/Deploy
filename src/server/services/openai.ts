@@ -3,7 +3,10 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 function getApiKey(): string {
-  const key = process.env.GROQ_API_KEY?.trim();
+  let key = process.env.GROQ_API_KEY?.trim() ?? "";
+  // Strip accidental "GROQ_API_KEY=gsk_..." or "GROQ_API_KEY gsk_..." copy-paste prefix.
+  const gskIdx = key.indexOf("gsk_");
+  if (gskIdx > 0) key = key.slice(gskIdx);
   if (!key) throw new Error("GROQ_API_KEY environment variable is not set");
   return key;
 }
