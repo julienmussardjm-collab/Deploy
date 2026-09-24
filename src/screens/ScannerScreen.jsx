@@ -38,8 +38,8 @@ export function ScannerScreen({
   const [cameraEl, setCameraEl] = useState(null);
   const [focusRing, setFocusRing] = useState(null);
 
-  const queuedColor = online ? '#fff' : 'var(--orange-500)';
-  const queuedValue = online ? '0' : String(queued);
+  const queuedColor = !online && queued > 0 ? 'var(--orange-500)' : '#fff';
+  const queuedValue = String(queued);
   const presets = zoomPresets(zoomRange);
 
   async function handleTap(e) {

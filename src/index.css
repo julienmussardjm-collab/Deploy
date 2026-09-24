@@ -1922,3 +1922,16 @@ textarea:focus-visible,
   min-height: 56px;
   font-size: 14px;
 }
+
+/* Team code and sync status */
+.id-error {
+  font: 500 12.5px/1.4 var(--font-body);
+  color: var(--status-error);
+}
+.ll-sync-note {
+  background: var(--status-warning-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  font: 400 12.5px/1.4 var(--font-body);
+  color: var(--text-body);
+  padding: 11px 18px;
+}

@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Mascot } from '../components/Mascot.jsx';
+import { checkTeamCode } from '../lib/teamSync.js';
 
-// Start screen: pick the event and who is scanning. Also reused to switch
-// user (`switching`) or change event (`startInEventMode`) mid-show.
+// Start screen: pick the event and who is scanning, and enter the team code
+// once per phone. Also reused to switch user (`switching`) or change event
+// (`startInEventMode`) mid-show.
 export function IdentityScreen({
+  teamCode: savedTeamCode,
+  teamCodeRejected,
   currentEvent,
   recentEvents,
   recentUsers,
@@ -15,9 +19,39 @@ export function IdentityScreen({
   const [editingEvent, setEditingEvent] = useState(!currentEvent || startInEventMode);
   const [eventName, setEventName] = useState(currentEvent?.name ?? '');
   const [eventLocation, setEventLocation] = useState(currentEvent?.location ?? '');
+  const needsTeamCode = !savedTeamCode || teamCodeRejected;
+  const [teamCode, setTeamCode] = useState('');
+  const [codeError, setCodeError] = useState(
+    teamCodeRejected ? 'This team code is no longer valid. Ask your coordinator.' : null,
+  );
+  const [checking, setChecking] = useState(false);
 
   const hasEvent = eventName.trim().length > 0;
-  const canStart = hasEvent && userName.trim().length > 0;
+  const hasCode = !needsTeamCode || teamCode.trim().length > 0;
+  const canStart = hasEvent && hasCode && userName.trim().length > 0 && !checking;
+
+  // Checks a newly entered team code. Without a connection the code is
+  // accepted for now and verified at the first sync.
+  async function confirm(name) {
+    if (!needsTeamCode) {
+      onConfirm({ name, eventName, eventLocation, teamCode: savedTeamCode });
+      return;
+    }
+    const code = teamCode.trim().toUpperCase();
+    setChecking(true);
+    setCodeError(null);
+    try {
+      if (!(await checkTeamCode(code))) {
+        setCodeError('Wrong team code.');
+        return;
+      }
+    } catch {
+      // Offline or database unreachable: accept, sync will verify.
+    } finally {
+      setChecking(false);
+    }
+    onConfirm({ name, eventName, eventLocation, teamCode: code });
+  }
 
   function pickRecentEvent(event) {
     setEventName(event.name);
@@ -27,7 +61,7 @@ export function IdentityScreen({
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (canStart) onConfirm({ name: userName, eventName, eventLocation });
+    if (canStart) confirm(userName);
   }
 
   return (
@@ -100,6 +134,26 @@ export function IdentityScreen({
           )}
         </section>
 
+        {needsTeamCode && (
+          <section className="id-section">
+            <label className="id-label" htmlFor="id-team-code">
+              Team code
+            </label>
+            <input
+              id="id-team-code"
+              className="id-input"
+              type="text"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="e.g. INV-XXXX-XXXX"
+              value={teamCode}
+              onChange={(e) => setTeamCode(e.target.value)}
+            />
+            {codeError && <span className="id-error">{codeError}</span>}
+          </section>
+        )}
+
         <section className="id-section">
           <label className="id-label" htmlFor="id-name">
             Your name
@@ -120,10 +174,8 @@ export function IdentityScreen({
                 <button
                   type="button"
                   className="id-chip id-chip-user"
-                  onClick={() =>
-                    hasEvent && onConfirm({ name: user.name, eventName, eventLocation })
-                  }
-                  disabled={!hasEvent}
+                  onClick={() => hasEvent && hasCode && confirm(user.name)}
+                  disabled={!hasEvent || !hasCode || checking}
                   key={user.name}
                 >
                   <span className="id-chip-initials">{user.initials}</span>
@@ -136,12 +188,14 @@ export function IdentityScreen({
 
         <div className="id-footer">
           <button className="btn btn-primary btn-lg" type="submit" disabled={!canStart}>
-            Start scanning
+            {checking ? 'Checking team code…' : 'Start scanning'}
           </button>
           <div className="id-footnote">
-            {hasEvent
-              ? 'Every lead you capture is tagged with this event and your name.'
-              : 'Name the event first — it stamps every lead captured today.'}
+            {needsTeamCode && hasEvent
+              ? 'The team code connects this phone to the shared lead list.'
+              : hasEvent
+                ? 'Every lead you capture is tagged with this event and your name.'
+                : 'Name the event first — it stamps every lead captured today.'}
           </div>
         </div>
       </form>

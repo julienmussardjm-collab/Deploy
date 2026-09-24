@@ -46,9 +46,32 @@ npm test
 npm run build
 ```
 
+## Team database (Supabase)
+
+Leads are stored on the phone first (IndexedDB), then uploaded to a shared
+Supabase database (project `inventronics-lead-scanner`, Frankfurt), so every
+phone sees the whole team's leads and nothing is lost with a phone.
+
+- Each phone enters the **team code** once on the start screen. The code is
+  never stored in this repository; ask the event coordinator. To rotate it, see
+  the header of `supabase/migrations/20260924_leads_and_team_access.sql`.
+- Without connection, leads are saved as `QUEUED` and upload automatically
+  when the phone is back online. Sync also runs every 30 s and after each save.
+- The app only calls the database functions `sync_leads` and `list_leads`,
+  which check the team code. The table itself is closed to the public API.
+- Leads captured with builds older than 2026-09-24 are uploaded automatically
+  the first time the phone opens this version.
+
+`src/lib/teamSync.js` holds the Supabase URL and publishable key (public by
+design). Override with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
+
 ## Known limitations
 
-- Leads are stored only in the browser of the device that scanned them.
-  "Synced" means the device was online when the lead was saved; nothing is
-  uploaded yet. Export to CSV at the end of each day.
-- The "Everyone / Mine" filter only covers leads on the current device.
+- The Supabase free plan pauses a project after 7 days without activity.
+  Open the app (or the Supabase dashboard) in the days before an event, or
+  move the project to a paid plan.
+- A badge scanned on two phones before either has synced gives two leads
+  (same badge ID in the CSV). Once synced, a re-scan on any phone updates the
+  existing lead.
+- No service worker yet: the page must be loaded once with a connection
+  before going offline.

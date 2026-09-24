@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCamera } from './hooks/useCamera.js';
 import { parseBadge } from './lib/badgeParser.js';
 import { exportLeads } from './lib/csvExport.js';
 import {
   findLeadByBadge,
-  flushQueue,
   getAllLeads,
   getStats,
   newId,
@@ -25,9 +24,12 @@ import {
   getCurrentUser,
   getRecentEvents,
   getRecentUsers,
+  getTeamCode,
   setCurrentEvent,
   setCurrentUser,
+  setTeamCode as saveTeamCode,
 } from './lib/session.js';
+import { InvalidTeamCodeError, syncNow } from './lib/teamSync.js';
 import { IdentityScreen } from './screens/IdentityScreen.jsx';
 import { LeadDetail } from './screens/LeadDetail.jsx';
 import { LeadList } from './screens/LeadList.jsx';
@@ -36,12 +38,18 @@ import { ScannerScreen } from './screens/ScannerScreen.jsx';
 
 // Short pause after a decode so the "Reading badge" state is visible.
 const READ_DELAY_MS = 550;
+// Background sync interval while online, so the team list stays current.
+const SYNC_INTERVAL_MS = 30_000;
 
 export function App() {
   const [currentUser, setUser] = useState(() => getCurrentUser());
   const [recentUsers, setRecentUsers] = useState(() => getRecentUsers());
   const [currentEvent, setEvent] = useState(() => getCurrentEvent());
   const [recentEvents, setRecentEvents] = useState(() => getRecentEvents());
+  const [teamCode, setTeamCode] = useState(() => getTeamCode());
+  const [teamCodeRejected, setTeamCodeRejected] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
+  const [syncError, setSyncError] = useState(null);
   const [switchingUser, setSwitchingUser] = useState(false);
   const [changingEvent, setChangingEvent] = useState(false);
 
@@ -60,15 +68,18 @@ export function App() {
   const [selectedLead, setSelectedLead] = useState(null);
   const readTimerRef = useRef(null);
 
-  async function refresh() {
-    setStats(await getStats());
-    setLeads(await getAllLeads());
-  }
-
+  const userName = currentUser?.name;
   useEffect(() => {
+    async function refresh() {
+      const all = await getAllLeads();
+      setStats(await getStats(userName));
+      setLeads(all);
+      // Keep the open lead in step with sync status and team edits.
+      setSelectedLead((open) => (open && all.find((lead) => lead.id === open.id)) || open);
+    }
     refresh();
     return subscribe(refresh);
-  }, []);
+  }, [userName]);
 
   useEffect(() => {
     const goOnline = () => setOnline(true);
@@ -81,12 +92,25 @@ export function App() {
     };
   }, []);
 
-  // Flush the offline queue when the connection comes back.
-  const wasOnlineRef = useRef(online);
+  const runSync = useCallback(async () => {
+    if (!teamCode || teamCodeRejected || !navigator.onLine) return;
+    try {
+      const result = await syncNow(teamCode);
+      setLastSyncAt(result.at);
+      setSyncError(null);
+    } catch (error) {
+      if (error instanceof InvalidTeamCodeError) setTeamCodeRejected(true);
+      else setSyncError(error.message);
+    }
+  }, [teamCode, teamCodeRejected]);
+
+  // Sync on start, whenever the connection comes back, and every 30 s.
   useEffect(() => {
-    if (online && !wasOnlineRef.current) flushQueue();
-    wasOnlineRef.current = online;
-  }, [online]);
+    if (!online) return undefined;
+    runSync();
+    const timer = setInterval(runSync, SYNC_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [online, runSync]);
 
   useEffect(() => () => clearTimeout(readTimerRef.current), []);
 
@@ -127,7 +151,9 @@ export function App() {
     setScreen('form');
   }
 
-  function confirmIdentity({ name, eventName, eventLocation }) {
+  function confirmIdentity({ name, eventName, eventLocation, teamCode: code }) {
+    setTeamCode(saveTeamCode(code));
+    setTeamCodeRejected(false);
     const event = setCurrentEvent(eventName, eventLocation);
     const user = setCurrentUser(name);
     setEvent(event);
@@ -169,7 +195,8 @@ export function App() {
         rawScan: draft.rawScan ?? selectedLead?.rawScan ?? null,
       };
       await updateLead(editingId, changes);
-      setSelectedLead({ ...selectedLead, ...changes });
+      runSync();
+      setSelectedLead({ ...selectedLead, ...changes, status: 'queued' });
       setEditingId(null);
       setIsRescan(false);
       setScreen('detail');
@@ -186,9 +213,9 @@ export function App() {
       capturedByInitials: currentUser?.initials ?? null,
       eventName: currentEvent?.name ?? null,
       eventLocation: currentEvent?.location ?? null,
-      status: online ? 'synced' : 'queued',
       rawScan: draft.rawScan ?? null,
     });
+    runSync();
     setIsManual(false);
     setSelectedLead(lead);
     setDetailReturnScreen('scanner');
@@ -213,11 +240,20 @@ export function App() {
     setScreen('detail');
   }
 
-  if (!currentUser || !currentEvent || switchingUser || changingEvent) {
+  const needsIdentity =
+    !currentUser ||
+    !currentEvent ||
+    !teamCode ||
+    teamCodeRejected ||
+    switchingUser ||
+    changingEvent;
+  if (needsIdentity) {
     return (
       <div className="app-shell">
         <div className="app-frame">
           <IdentityScreen
+            teamCode={teamCode}
+            teamCodeRejected={teamCodeRejected}
             currentEvent={currentEvent}
             recentEvents={recentEvents}
             recentUsers={recentUsers}
@@ -290,6 +326,9 @@ export function App() {
         {screen === 'leads' && (
           <LeadList
             leads={leads}
+            online={online}
+            lastSyncAt={lastSyncAt}
+            syncError={syncError}
             currentUser={currentUser}
             onBack={() => setScreen('scanner')}
             onOpenLead={openLead}

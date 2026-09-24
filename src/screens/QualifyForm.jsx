@@ -136,8 +136,8 @@ export function QualifyForm({
     : isEditing
       ? 'Updates this lead.'
       : online
-        ? 'Posts to CRM immediately.'
-        : 'Stored locally — uploads on reconnect.';
+        ? 'Saved to the team lead list.'
+        : 'Stored on this phone — uploads when back online.';
 
   return (
     <div className="qf-root">

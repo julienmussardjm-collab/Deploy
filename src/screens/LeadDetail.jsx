@@ -17,7 +17,9 @@ export function LeadDetail({ lead, onBack, onEdit, onScanNext }) {
           </button>
           <span
             className="ld-status-pill"
-            title={queued ? 'Held on device — uploads to CRM on reconnect' : 'Synced to CRM'}
+            title={
+              queued ? 'Stored on this phone — uploads when online' : 'Saved to the team lead list'
+            }
           >
             <span
               className="ld-status-dot"

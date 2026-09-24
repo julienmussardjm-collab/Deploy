@@ -22,11 +22,32 @@ function formatCapturedAt(timestamp) {
 // boothLabel is the field name used by early builds.
 const eventOf = (lead) => lead.eventName || lead.boothLabel || NO_EVENT;
 
-export function LeadList({ leads, currentUser, onBack, onOpenLead, onExport }) {
+export function LeadList({
+  leads,
+  currentUser,
+  online,
+  lastSyncAt,
+  syncError,
+  onBack,
+  onOpenLead,
+  onExport,
+}) {
   const [owner, setOwner] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState('all');
   const [exportResult, setExportResult] = useState(null);
   const scrolled = useScrolled();
+
+  const queuedCount = leads.filter((lead) => lead.status === 'queued').length;
+  const syncLabel = !online
+    ? 'offline'
+    : lastSyncAt
+      ? `synced ${timeFormat.format(lastSyncAt)}`
+      : 'syncing…';
+  const syncNote = syncError
+    ? `Team sync failed — ${queuedCount} lead${queuedCount === 1 ? '' : 's'} kept on this phone. Retrying automatically.`
+    : !online && queuedCount > 0
+      ? `${queuedCount} lead${queuedCount === 1 ? '' : 's'} waiting to upload. ${queuedCount === 1 ? 'It stays' : 'They stay'} on this phone until it is back online.`
+      : null;
 
   const eventCounts = (() => {
     const counts = new Map();
@@ -82,7 +103,9 @@ export function LeadList({ leads, currentUser, onBack, onOpenLead, onExport }) {
           <BackIcon />
         </button>
         <div className="ll-header-mid">
-          <div className="ll-eyebrow">{leads.length} captured</div>
+          <div className="ll-eyebrow">
+            {leads.length} captured · {syncLabel}
+          </div>
           <div className="ll-title">Leads</div>
         </div>
         <button
@@ -135,6 +158,8 @@ export function LeadList({ leads, currentUser, onBack, onOpenLead, onExport }) {
           </div>
         )}
       </div>
+
+      {syncNote && <div className="ll-sync-note">{syncNote}</div>}
 
       {exportResult && (
         <div className="ll-export-note">

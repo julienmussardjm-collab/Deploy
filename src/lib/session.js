@@ -67,3 +67,19 @@ export function setCurrentUser(name) {
   pushRecent(RECENT_USERS_KEY, user, getRecentUsers(), MAX_RECENT_USERS);
   return user;
 }
+
+// Shared code that unlocks the team database. Entered once per phone.
+const TEAM_CODE_KEY = 'lead-scanner:team-code';
+
+export function getTeamCode() {
+  return readJson(TEAM_CODE_KEY, null);
+}
+
+export function setTeamCode(code) {
+  const normalized = String(code ?? '')
+    .trim()
+    .toUpperCase();
+  if (normalized) localStorage.setItem(TEAM_CODE_KEY, JSON.stringify(normalized));
+  else localStorage.removeItem(TEAM_CODE_KEY);
+  return normalized || null;
+}
