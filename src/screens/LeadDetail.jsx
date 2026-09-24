@@ -1,9 +1,18 @@
 import { useState } from 'react';
+import { CompanyIntelCard } from '../components/CompanyIntel.jsx';
 import { BackIcon, MailIcon, PhoneIcon } from '../components/icons.jsx';
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
-export function LeadDetail({ lead, onBack, onEdit, onScanNext, onDelete }) {
+export function LeadDetail({
+  lead,
+  researching,
+  onRefreshIntel,
+  onBack,
+  onEdit,
+  onScanNext,
+  onDelete,
+}) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const queued = lead.status === 'queued';
   const location = lead.eventLocation || lead.boothLocation || '';
@@ -88,6 +97,8 @@ export function LeadDetail({ lead, onBack, onEdit, onScanNext, onDelete }) {
           </div>
         </div>
       </div>
+
+      <CompanyIntelCard lead={lead} researching={researching} onRefresh={onRefreshIntel} />
 
       <div className="ld-card">
         <span className="ld-eyebrow">Area of interest</span>

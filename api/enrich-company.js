@@ -117,6 +117,11 @@ function sameDomain(email, domain) {
   return email.endsWith(`@${domain}`) || email.endsWith(`.${domain}`);
 }
 
+// Generic company mailboxes (info@, sales@, vertrieb@...). Named addresses of
+// other employees are left out: useless for this lead, and personal data.
+const ROLE_MAILBOX =
+  /^(info|contact|kontakt|contatti|contacto|hello|hallo|sales|vertrieb|verkauf|vendite|ventes|ventas|commercial|export|office|buero|mail|service|support|kundenservice|marketing|press|presse|stampa|enquiries|inquiries|orders|order|bestellung|ordini|commandes|welcome|team|admin|zentrale|reception|headoffice)([.-][a-z]{2,})?@/;
+
 export async function researchCompany({ name, company, country, email }) {
   const at = Date.now();
   const badgeEmail =
@@ -163,8 +168,8 @@ export async function researchCompany({ name, company, country, email }) {
     domain,
   });
 
-  const siteEmails = [...new Set(pages.flatMap((p) => p.emails))].filter((e) =>
-    sameDomain(e, domain),
+  const siteEmails = [...new Set(pages.flatMap((p) => p.emails))].filter(
+    (e) => sameDomain(e, domain) && ROLE_MAILBOX.test(e),
   );
   const { first, last } = splitName(name);
   const guessed =
@@ -180,7 +185,9 @@ export async function researchCompany({ name, company, country, email }) {
     description: (main?.description || org?.description || '').slice(0, 400) || null,
     country: org?.country || countryFromDomain(domain),
     city: org?.city || null,
-    phone: org?.telephone || pages.flatMap((p) => p.phones)[0] || null,
+    // Only the number the company declares for itself: the first tel: link is
+    // often a subsidiary or a support line.
+    phone: org?.telephone || null,
     employees: org?.employees ?? null,
     founded: org?.founded ?? null,
     ...classification,
@@ -225,7 +232,7 @@ export default async function handler(req, res) {
           .toUpperCase(),
       ))
     ) {
-      res.status(401).json({ error: 'invalid_team_code' });
+      res.status(403).json({ error: 'invalid_team_code' });
       return;
     }
   } catch {

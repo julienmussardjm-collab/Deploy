@@ -81,6 +81,33 @@ phone sees the whole team's leads and nothing is lost with a phone.
 `src/lib/teamSync.js` holds the Supabase URL and publishable key (public by
 design). Override with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
+## Company intel (research at scan time)
+
+As soon as a badge is scanned, `/api/enrich-company` researches the
+attendee's company, without AI and without scraping LinkedIn:
+
+1. Website from the badge email domain (free-mail providers skipped), else
+   from the company name + country (domain guess checked with MX records).
+2. Reads the home page and up to three about / contact / product pages:
+   description, schema.org data (country, city, declared phone, employees,
+   founding year), company LinkedIn page and social links, generic company
+   mailboxes (`info@`, `sales@`... never named employees).
+3. Keyword classification in six languages (`api/_lib/classify.js`): company
+   type (OEM luminaire maker, distributor, lighting designer, installer,
+   competitor, Inventronics), up to four Inventronics segments, technical
+   topics (DALI-2, D4i, Zhaga...). Rule-based: shown with a confidence level.
+
+The form shows the result a few seconds after the scan, with the suggested
+segments one tap away; the lead page shows the full card. "Find ... on
+LinkedIn" opens a LinkedIn search in the rep's own LinkedIn app: nothing is
+scraped or stored. The intel syncs with the lead (`intel` column) and is
+wiped when the lead is deleted. Leads saved offline are researched when the
+phone is back online. The endpoint requires the team code.
+
+Limits: sites that block automated visits return no profile (the card says
+so and still offers the LinkedIn and web search links); JavaScript-only
+sites give little text to classify.
+
 ## Known limitations
 
 - The Supabase free plan pauses a project after 7 days without activity.

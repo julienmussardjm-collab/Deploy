@@ -66,6 +66,7 @@ export function toRemote(lead) {
     capturedAt: lead.capturedAt,
     updatedAt: lead.updatedAt ?? lead.capturedAt,
     deletedAt: lead.deletedAt ?? null,
+    intel: lead.intel ?? null,
   };
 }
 
@@ -93,6 +94,7 @@ export function fromRemote(row) {
     capturedAt: Date.parse(row.captured_at),
     updatedAt: Date.parse(row.updated_at),
     deletedAt: row.deleted_at ? Date.parse(row.deleted_at) : null,
+    intel: row.intel ?? null,
   };
 }
 

@@ -79,6 +79,16 @@ const COMPANY_TYPES = [
           'groothandel',
           'authorized distributor',
           'official distributor',
+          'materiel electrique',
+          'fournitures electriques',
+          'distributeur de materiel',
+          'elektrogrosshandel',
+          'elektrogrosshandler',
+          'materiale elettrico',
+          'material electrico',
+          'electrical wholesaler',
+          'electrical supplies',
+          'multi specialiste',
         ],
       ],
       [
@@ -142,18 +152,7 @@ const COMPANY_TYPES = [
           'instalaciones electricas',
         ],
       ],
-      [
-        1,
-        [
-          'installer',
-          'installation',
-          'electricien',
-          'elektrotechnik',
-          'installatore',
-          'instalador',
-          'maintenance contracts',
-        ],
-      ],
+      [1, ['installer', 'installatore', 'instalador', 'maintenance contracts']],
     ],
   ],
   [
@@ -384,9 +383,15 @@ export function classifyCompany({ text = '', name = '', domain = '' }) {
     };
   }
 
-  const segments = SEGMENTS.filter(([, terms]) => terms.some((t) => count(haystack, t))).map(
-    ([label]) => label,
-  );
+  // Most-mentioned segments first; big manufacturers list them all, so keep four.
+  const segments = SEGMENTS.map(([label, terms]) => [
+    label,
+    terms.reduce((n, t) => n + count(haystack, t), 0),
+  ])
+    .filter(([, hits]) => hits > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([label]) => label);
   const tech = TECH.filter(([, terms]) => terms.some((t) => count(haystack, t))).map(
     ([label]) => label,
   );

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { UpdateBanner } from './components/UpdateBanner.jsx';
 import { useCamera } from './hooks/useCamera.js';
+import { useCompanyIntel } from './hooks/useCompanyIntel.js';
 import { useUpdateAvailable } from './hooks/useUpdateAvailable.js';
 import { parseBadge } from './lib/badgeParser.js';
+import { canResearch, intelKey, requestIntel } from './lib/companyIntel.js';
 import { exportLeads } from './lib/csvExport.js';
 import {
   deleteLead,
@@ -11,6 +13,7 @@ import {
   getStats,
   newId,
   saveLead,
+  setLeadIntel,
   subscribe,
   updateLead,
 } from './lib/leadStore.js';
@@ -71,6 +74,10 @@ export function App() {
   const [selectedLead, setSelectedLead] = useState(null);
   const readTimerRef = useRef(null);
   const updateAvailable = useUpdateAvailable();
+  const [researching, setResearching] = useState(() => new Set());
+  const researchedRef = useRef(new Set());
+  // Leads whose company changed in an edit here, whoever captured them.
+  const reresearchRef = useRef(new Set());
 
   const userName = currentUser?.name;
   useEffect(() => {
@@ -118,6 +125,43 @@ export function App() {
 
   useEffect(() => () => clearTimeout(readTimerRef.current), []);
 
+  // Company research for one saved lead; `fresh` bypasses the session cache.
+  const researchLead = useCallback(
+    async (lead, { fresh = false } = {}) => {
+      setResearching((ids) => new Set(ids).add(lead.id));
+      try {
+        const intel = await requestIntel(lead, teamCode, { fresh });
+        await setLeadIntel(lead.id, intel);
+        runSync();
+      } catch {
+        // Research is best effort; the lead is saved either way.
+      } finally {
+        setResearching((ids) => {
+          const next = new Set(ids);
+          next.delete(lead.id);
+          return next;
+        });
+      }
+    },
+    [teamCode, runSync],
+  );
+
+  // Background pass: my leads saved without company intel (captured offline,
+  // or saved before the research finished) get researched once online.
+  useEffect(() => {
+    if (!online || !teamCode || teamCodeRejected || researching.size) return;
+    const next = leads.find(
+      (lead) =>
+        !lead.intel &&
+        (lead.capturedBy === userName || reresearchRef.current.has(lead.id)) &&
+        !researchedRef.current.has(lead.id) &&
+        canResearch(lead),
+    );
+    if (!next) return;
+    researchedRef.current.add(next.id);
+    researchLead(next);
+  }, [leads, online, teamCode, teamCodeRejected, userName, researching, researchLead]);
+
   function handleDetect(raw) {
     if (reading) return;
     setReading(true);
@@ -141,6 +185,18 @@ export function App() {
       setScreen('form');
     }, READ_DELAY_MS);
   }
+
+  // Research starts while the rep qualifies the lead, right after the scan.
+  const editingLead = editingId ? leads.find((l) => l.id === editingId) || selectedLead : null;
+  const intelState = useCompanyIntel(screen === 'form' ? draft.contact : null, {
+    code: teamCode,
+    online,
+    existing: editingLead?.intel,
+  });
+  const readyIntel =
+    intelState.status === 'done' && intelState.intel !== editingLead?.intel
+      ? intelState.intel
+      : null;
 
   const camera = useCamera({
     active: screen === 'scanner' && !!currentUser && !switchingUser,
@@ -195,10 +251,18 @@ export function App() {
     };
 
     if (editingId) {
+      // Company or email changed and no fresh research yet: drop the old card
+      // so the background pass researches the new company.
+      const staleIntel = !!editingLead?.intel && editingLead.intel.key !== intelKey(contact);
+      if (staleIntel && !readyIntel) {
+        researchedRef.current.delete(editingId);
+        reresearchRef.current.add(editingId);
+      }
       const changes = {
         ...contact,
         ...qualification,
         rawScan: draft.rawScan ?? selectedLead?.rawScan ?? null,
+        ...(readyIntel ? { intel: readyIntel } : staleIntel ? { intel: null } : {}),
       };
       await updateLead(editingId, changes);
       runSync();
@@ -220,6 +284,7 @@ export function App() {
       eventName: currentEvent?.name ?? null,
       eventLocation: currentEvent?.location ?? null,
       rawScan: draft.rawScan ?? null,
+      ...(readyIntel ? { intel: readyIntel } : {}),
     });
     runSync();
     setIsManual(false);
@@ -321,6 +386,7 @@ export function App() {
             priorities={PRIORITIES}
             notes={draft.notes}
             consent={draft.consent}
+            intelState={intelState}
             isEditing={!!editingId}
             isManual={isManual}
             isRescan={isRescan}
@@ -339,6 +405,10 @@ export function App() {
         {screen === 'detail' && selectedLead && (
           <LeadDetail
             lead={selectedLead}
+            researching={researching.has(selectedLead.id)}
+            onRefreshIntel={
+              online && teamCode ? () => researchLead(selectedLead, { fresh: true }) : undefined
+            }
             onBack={() => setScreen(detailReturnScreen)}
             onEdit={editSelectedLead}
             onScanNext={() => setScreen('scanner')}

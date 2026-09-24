@@ -11,6 +11,10 @@ vi.mock('dns/promises', () => ({
   },
 }));
 
+vi.mock('../api/_lib/team.js', () => ({
+  teamCodeOk: vi.fn(async (code) => code === 'INV-GOOD-CODE'),
+}));
+
 const home = fs.readFileSync('tests/fixtures/lumen-home.html', 'utf8');
 const about = fs.readFileSync('tests/fixtures/lumen-about.html', 'utf8');
 
@@ -78,6 +82,28 @@ describe('classifyCompany', () => {
     expect(result.companyType).toBe('Distributor / wholesaler');
   });
 
+  it('sees a French electrical wholesaler as a distributor, not an installer', () => {
+    const result = classifyCompany({
+      text:
+        'Rexel, leader multi-spécialiste du matériel électrique professionnel. ' +
+        'Solutions pour les électriciens : installation, éclairage, sécurité. Livraison sur chantier.',
+      domain: 'rexel.fr',
+    });
+    expect(result.companyType).toBe('Distributor / wholesaler');
+  });
+
+  it('keeps the four most-mentioned segments', () => {
+    const result = classifyCompany({
+      text:
+        'street lighting street lighting street lighting stadium stadium greenhouse ' +
+        'high bay office lighting signage facade lighting',
+      domain: 'x.com',
+    });
+    expect(result.segments).toHaveLength(4);
+    expect(result.segments[0]).toBe('Street & Area');
+    expect(result.segments[1]).toBe('Sports');
+  });
+
   it('flags competitors and Inventronics itself by domain', () => {
     expect(classifyCompany({ text: '', domain: 'meanwell.com' }).companyType).toBe(
       'LED driver / power supply maker (competitor)',
@@ -102,7 +128,12 @@ describe('classifyCompany', () => {
 describe('researchCompany', () => {
   const pages = {
     'https://lumen-licht.de/': { html: home, url: 'https://www.lumen-licht.de/' },
-    'https://www.lumen-licht.de/de/unternehmen/': { html: about },
+    'https://www.lumen-licht.de/de/unternehmen/': {
+      html: about.replace(
+        'presse@lumen-licht.de',
+        'presse@lumen-licht.de, jan.weber@lumen-licht.de',
+      ),
+    },
   };
 
   beforeEach(() => {
@@ -149,6 +180,8 @@ describe('researchCompany', () => {
         'presse@lumen-licht.de',
       ]),
     );
+    expect(intel.email.found).not.toContain('jan.weber@lumen-licht.de'); // a named colleague
+    expect(intel.phone).toBe('+49 711 123456'); // declared by the company, not the first tel: link
     expect(intel.email.guessed).toEqual([]); // the badge already has a work email
   });
 
@@ -170,5 +203,29 @@ describe('researchCompany', () => {
     const { researchCompany } = await import('../api/enrich-company.js');
     const intel = await researchCompany({ name: 'Jo', company: '', email: '' });
     expect(intel.status).toBe('no_company');
+  });
+});
+
+describe('enrich-company handler', () => {
+  function call(query) {
+    const res = { statusCode: 0, body: null, headers: {} };
+    res.status = (code) => ((res.statusCode = code), res);
+    res.json = (body) => ((res.body = body), res);
+    res.setHeader = (k, v) => (res.headers[k] = v);
+    return import('../api/enrich-company.js').then(({ default: handler }) =>
+      handler({ method: 'GET', query }, res).then(() => res),
+    );
+  }
+
+  it('refuses a wrong team code', async () => {
+    const res = await call({ code: 'nope', company: 'Acme' });
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: 'invalid_team_code' });
+  });
+
+  it('answers with the right code (case-insensitive)', async () => {
+    const res = await call({ code: 'inv-good-code', name: 'Jo', company: '' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe('no_company');
   });
 });

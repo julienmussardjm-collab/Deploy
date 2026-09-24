@@ -89,6 +89,20 @@ export async function updateLead(id, changes) {
   notifyChange();
 }
 
+// Attaches company research to a lead and queues it for the team.
+export async function setLeadIntel(id, intel) {
+  await withStore('readwrite', (store) => {
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const lead = request.result;
+      if (lead && !lead.deletedAt) {
+        store.put({ ...lead, intel, status: 'queued', updatedAt: Date.now() });
+      }
+    };
+  });
+  notifyChange();
+}
+
 export async function findLeadByBadge(badgeId) {
   return withStore(
     'readonly',
@@ -206,7 +220,13 @@ export async function mergeRemoteLeads(remoteLeads) {
         }
         if (local?.deletedAt) return;
         if (local && local.status === 'queued' && local.updatedAt > remote.updatedAt) return;
-        store.put({ ...local, ...remote, status: 'synced' });
+        // A team copy without intel (older app version) keeps the local one.
+        store.put({
+          ...local,
+          ...remote,
+          intel: remote.intel ?? local?.intel ?? null,
+          status: 'synced',
+        });
       };
     }
   });

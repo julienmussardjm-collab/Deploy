@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IntelPanel } from '../components/CompanyIntel.jsx';
 import { BackIcon } from '../components/icons.jsx';
 import { useScrolled } from '../hooks/useScrolled.js';
 import { lookupEmail } from '../lib/emailLookup.js';
@@ -114,6 +115,7 @@ export function QualifyForm({
   priorities,
   notes,
   consent,
+  intelState,
   isEditing,
   isManual,
   isRescan,
@@ -191,6 +193,15 @@ export function QualifyForm({
           ))}
         </div>
       </div>
+
+      {intelState && (
+        <IntelPanel
+          state={intelState}
+          contact={contact}
+          interests={interests}
+          onToggleInterest={onToggleInterest}
+        />
+      )}
 
       <div className="qf-card">
         <div className="qf-row-baseline">

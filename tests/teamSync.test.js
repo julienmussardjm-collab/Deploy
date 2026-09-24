@@ -25,6 +25,7 @@ describe('team sync mapping', () => {
     capturedAt: Date.UTC(2026, 8, 24, 9, 0),
     updatedAt: Date.UTC(2026, 8, 24, 9, 5),
     deletedAt: null,
+    intel: { status: 'done', domain: 'lumen.nl', companyType: 'Luminaire manufacturer (OEM)' },
     status: 'queued',
   };
 
@@ -82,6 +83,7 @@ describe('team sync mapping', () => {
       consent: true,
       consent_at: '2026-09-24T09:01:00+00:00',
       deleted_at: null,
+      intel: { status: 'done', domain: 'lumen.nl', companyType: 'Luminaire manufacturer (OEM)' },
       captured_at: '2026-09-24T09:00:00+00:00',
       updated_at: '2026-09-24T09:05:00+00:00',
       received_at: '2026-09-24T09:05:01.123456+00:00',
