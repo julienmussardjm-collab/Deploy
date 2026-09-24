@@ -1,0 +1,9 @@
+{
+  "name": "Inventronics Lead Scanner",
+  "short_name": "Lead Scanner",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020f11",
+  "theme_color": "#020f11",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
