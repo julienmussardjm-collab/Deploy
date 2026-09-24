@@ -1,6 +1,8 @@
 // Lead storage in the browser's IndexedDB, the source of truth on the phone.
 // Every local change is marked `queued` until teamSync.js has uploaded it to
 // the team database; leads pulled from the team arrive already `synced`.
+// A deleted lead stays as a tombstone (id and dates only, personal data
+// dropped) so the deletion reaches the other phones; the UI never shows it.
 
 const DB_NAME = 'lead-scanner';
 const DB_VERSION = 3;
@@ -117,6 +119,8 @@ export async function saveLead(lead) {
                 action: lead.action,
                 priority: lead.priority,
                 notes: lead.notes,
+                consent: lead.consent,
+                consentAt: lead.consentAt,
                 status: 'queued',
                 updatedAt: now,
               }
@@ -132,9 +136,37 @@ export async function saveLead(lead) {
   return result;
 }
 
+// Visible leads, newest first (tombstones excluded).
 export async function getAllLeads() {
   const leads = await withStore('readonly', (store) => getAllFrom(store));
-  return leads.sort((a, b) => b.capturedAt - a.capturedAt);
+  return leads.filter((lead) => !lead.deletedAt).sort((a, b) => b.capturedAt - a.capturedAt);
+}
+
+function tombstone(lead, deletedAt) {
+  return {
+    id: lead.id,
+    badgeId: '',
+    capturedAt: lead.capturedAt,
+    capturedBy: lead.capturedBy ?? null,
+    capturedByInitials: lead.capturedByInitials ?? null,
+    eventName: lead.eventName ?? lead.boothLabel ?? null,
+    eventLocation: lead.eventLocation ?? lead.boothLocation ?? null,
+    deletedAt,
+    updatedAt: deletedAt,
+  };
+}
+
+// Deletes a lead on this phone and queues the deletion for the team database,
+// which wipes its personal data too.
+export async function deleteLead(id) {
+  await withStore('readwrite', (store) => {
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const lead = request.result;
+      if (lead) store.put({ ...tombstone(lead, Date.now()), status: 'queued' });
+    };
+  });
+  notifyChange();
 }
 
 export async function getQueuedLeads() {
@@ -167,6 +199,12 @@ export async function mergeRemoteLeads(remoteLeads) {
       const request = store.get(remote.id);
       request.onsuccess = () => {
         const local = request.result;
+        // A deletion always wins, from either side.
+        if (remote.deletedAt) {
+          store.put({ ...tombstone(remote, remote.deletedAt), status: 'synced' });
+          return;
+        }
+        if (local?.deletedAt) return;
         if (local && local.status === 'queued' && local.updatedAt > remote.updatedAt) return;
         store.put({ ...local, ...remote, status: 'synced' });
       };

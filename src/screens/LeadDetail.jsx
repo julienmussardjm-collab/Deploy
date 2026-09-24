@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { BackIcon, MailIcon, PhoneIcon } from '../components/icons.jsx';
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
-export function LeadDetail({ lead, onBack, onEdit, onScanNext }) {
+export function LeadDetail({ lead, onBack, onEdit, onScanNext, onDelete }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const queued = lead.status === 'queued';
   const location = lead.eventLocation || lead.boothLocation || '';
   const captured = [timeFormat.format(lead.capturedAt), location].filter(Boolean).join(' · ');
@@ -76,6 +78,14 @@ export function LeadDetail({ lead, onBack, onEdit, onScanNext }) {
             <span className="ld-row-label">Captured</span>
             <span className="ld-row-value ld-medium">{captured}</span>
           </div>
+          <div className="ld-row">
+            <span className="ld-row-label">Consent</span>
+            <span className="ld-row-value ld-medium">
+              {lead.consent
+                ? `Agreed to be contacted${lead.consentAt ? ` · ${timeFormat.format(lead.consentAt)}` : ''}`
+                : 'Not given'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -118,6 +128,29 @@ export function LeadDetail({ lead, onBack, onEdit, onScanNext }) {
           <pre className="ld-raw-body">{lead.rawScan}</pre>
         </details>
       )}
+
+      <div className="ld-delete">
+        {confirmingDelete ? (
+          <>
+            <div className="ld-delete-warning">
+              Delete {lead.name} for the whole team? Their personal data is erased from the team
+              database. This cannot be undone.
+            </div>
+            <div className="ld-delete-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </button>
+              <button className="btn ld-delete-confirm" onClick={onDelete}>
+                Delete lead
+              </button>
+            </div>
+          </>
+        ) : (
+          <button className="ld-delete-link" onClick={() => setConfirmingDelete(true)}>
+            Delete this lead
+          </button>
+        )}
+      </div>
 
       <div className="ld-footer">
         <button className="btn btn-secondary ld-edit-btn" onClick={onEdit}>

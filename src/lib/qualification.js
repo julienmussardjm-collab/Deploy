@@ -40,6 +40,8 @@ export function newDraft(contact, rawScan) {
     action: FOLLOW_UP_ACTIONS[0][0],
     priority: 'Warm',
     notes: '',
+    consent: false,
+    consentAt: null,
     rawScan: rawScan ?? null,
   };
 }
@@ -59,6 +61,8 @@ export function draftFromLead(lead, rawScan) {
     action: lead.action,
     priority: lead.priority ?? 'Warm',
     notes: lead.notes ?? '',
+    consent: !!lead.consent,
+    consentAt: lead.consentAt ?? null,
     rawScan: rawScan !== undefined ? rawScan : (lead.rawScan ?? null),
   };
 }

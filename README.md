@@ -61,6 +61,11 @@ phone sees the whole team's leads and nothing is lost with a phone.
   which check the team code. The table itself is closed to the public API.
 - Leads captured with builds older than 2026-09-24 are uploaded automatically
   the first time the phone opens this version.
+- **Consent**: the lead form records whether the attendee agreed to be
+  contacted, with the time; both are in the CSV export.
+- **Deletion** (lead detail → "Delete this lead") removes the lead on every
+  phone and wipes its personal data in the database; only the id, dates,
+  capturing user and event remain.
 
 `src/lib/teamSync.js` holds the Supabase URL and publishable key (public by
 design). Override with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
@@ -73,5 +78,6 @@ design). Override with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - A badge scanned on two phones before either has synced gives two leads
   (same badge ID in the CSV). Once synced, a re-scan on any phone updates the
   existing lead.
-- No service worker yet: the page must be loaded once with a connection
-  before going offline.
+- Offline: `public/sw.js` keeps the app on the phone after the first visit
+  with a connection, so it opens without network. Open the app once on each
+  phone before the show.

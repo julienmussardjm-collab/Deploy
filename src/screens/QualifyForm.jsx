@@ -113,6 +113,7 @@ export function QualifyForm({
   priority,
   priorities,
   notes,
+  consent,
   isEditing,
   isManual,
   isRescan,
@@ -121,6 +122,7 @@ export function QualifyForm({
   onSetAction,
   onSetPriority,
   onSetNotes,
+  onSetConsent,
   onSetContactField,
   onSave,
 }) {
@@ -264,6 +266,27 @@ export function QualifyForm({
             onChange={(e) => onSetNotes(e.target.value)}
           />
         </label>
+      </div>
+
+      <div className="qf-card">
+        <span className="qf-eyebrow">Consent</span>
+        <button
+          type="button"
+          className={`qf-consent${consent ? ' qf-consent-on' : ''}`}
+          onClick={() => onSetConsent(!consent)}
+          aria-pressed={consent}
+        >
+          <span className={`qf-checkbox${consent ? ' qf-checkbox-on' : ''}`}>
+            <span className="qf-checkbox-tick" />
+          </span>
+          <span className="qf-consent-text">
+            The attendee agrees that Inventronics contacts them about this request and related
+            products.
+          </span>
+        </button>
+        <span className="qf-consent-hint">
+          Ask before ticking. Without consent, keep follow-up to what they asked for.
+        </span>
       </div>
 
       <div className="qf-savebar">

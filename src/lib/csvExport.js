@@ -15,6 +15,11 @@ const COLUMNS = [
   ['Follow-up action', (lead) => lead.action],
   ['Priority', (lead) => lead.priority || ''],
   ['Notes', (lead) => lead.notes || ''],
+  ['Consent to contact', (lead) => (lead.consent ? 'Yes' : 'No')],
+  [
+    'Consent recorded at',
+    (lead) => (lead.consent && lead.consentAt ? new Date(lead.consentAt).toISOString() : ''),
+  ],
   ['Captured by', (lead) => lead.capturedBy || ''],
   ['Captured at', (lead) => (lead.capturedAt ? new Date(lead.capturedAt).toISOString() : '')],
   ['Sync status', (lead) => lead.status || ''],

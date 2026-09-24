@@ -1935,3 +1935,80 @@ textarea:focus-visible,
   color: var(--text-body);
   padding: 11px 18px;
 }
+
+/* Consent */
+.qf-consent {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-btn);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 13px;
+  color: var(--text-body);
+}
+.qf-consent .qf-checkbox {
+  margin-top: 2px;
+}
+.qf-consent-on {
+  border-color: var(--orange-500);
+  background: var(--orange-50);
+  color: var(--text-strong);
+}
+.qf-consent:active {
+  background: var(--gray-50);
+}
+.qf-consent-on:active {
+  background: var(--orange-100);
+}
+.qf-consent-text {
+  font: 500 13.5px/1.4 var(--font-body);
+}
+.qf-consent-hint {
+  display: block;
+  margin-top: 8px;
+  font: 400 11.5px/1.4 var(--font-body);
+  color: var(--text-faint);
+}
+
+/* Delete lead */
+.ld-delete {
+  background: #fff;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px 18px;
+}
+.ld-delete-link {
+  border: none;
+  background: none;
+  padding: 6px 0;
+  cursor: pointer;
+  font: 500 13px/1 var(--font-body);
+  color: var(--status-error);
+}
+.ld-delete-warning {
+  border-left: 3px solid var(--status-error);
+  border-radius: var(--radius-btn);
+  background: var(--status-error-bg);
+  padding: 12px 14px;
+  font: 400 13px/1.45 var(--font-body);
+  color: var(--text-body);
+}
+.ld-delete-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.ld-delete-actions .btn {
+  flex: 1;
+}
+.ld-delete-confirm {
+  background: var(--status-error);
+  color: #fff;
+}
+.ld-delete-confirm:active {
+  background: #a02820;
+}

@@ -61,8 +61,11 @@ export function toRemote(lead) {
     eventName: lead.eventName || lead.boothLabel || null,
     eventLocation: lead.eventLocation || lead.boothLocation || null,
     rawScan: lead.rawScan,
+    consent: !!lead.consent,
+    consentAt: lead.consentAt ?? null,
     capturedAt: lead.capturedAt,
     updatedAt: lead.updatedAt ?? lead.capturedAt,
+    deletedAt: lead.deletedAt ?? null,
   };
 }
 
@@ -85,8 +88,11 @@ export function fromRemote(row) {
     eventName: row.event_name,
     eventLocation: row.event_location,
     rawScan: row.raw_scan,
+    consent: !!row.consent,
+    consentAt: row.consent_at ? Date.parse(row.consent_at) : null,
     capturedAt: Date.parse(row.captured_at),
     updatedAt: Date.parse(row.updated_at),
+    deletedAt: row.deleted_at ? Date.parse(row.deleted_at) : null,
   };
 }
 

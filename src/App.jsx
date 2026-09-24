@@ -3,6 +3,7 @@ import { useCamera } from './hooks/useCamera.js';
 import { parseBadge } from './lib/badgeParser.js';
 import { exportLeads } from './lib/csvExport.js';
 import {
+  deleteLead,
   findLeadByBadge,
   getAllLeads,
   getStats,
@@ -186,6 +187,8 @@ export function App() {
       action: draft.action,
       priority: draft.priority,
       notes: draft.notes.trim(),
+      consent: draft.consent,
+      consentAt: draft.consent ? draft.consentAt : null,
     };
 
     if (editingId) {
@@ -232,6 +235,14 @@ export function App() {
     setEditingId(selectedLead.id);
     setDraft(draftFromLead(selectedLead));
     setScreen('form');
+  }
+
+  async function deleteSelectedLead() {
+    if (!selectedLead) return;
+    await deleteLead(selectedLead.id);
+    runSync();
+    setSelectedLead(null);
+    setScreen(detailReturnScreen);
   }
 
   function openLead(lead) {
@@ -303,6 +314,7 @@ export function App() {
             priority={draft.priority}
             priorities={PRIORITIES}
             notes={draft.notes}
+            consent={draft.consent}
             isEditing={!!editingId}
             isManual={isManual}
             isRescan={isRescan}
@@ -311,6 +323,9 @@ export function App() {
             onSetAction={(action) => setDraft((d) => ({ ...d, action }))}
             onSetPriority={(priority) => setDraft((d) => ({ ...d, priority }))}
             onSetNotes={(notes) => setDraft((d) => ({ ...d, notes }))}
+            onSetConsent={(consent) =>
+              setDraft((d) => ({ ...d, consent, consentAt: consent ? Date.now() : null }))
+            }
             onSetContactField={setContactField}
             onSave={handleSave}
           />
@@ -321,6 +336,7 @@ export function App() {
             onBack={() => setScreen(detailReturnScreen)}
             onEdit={editSelectedLead}
             onScanNext={() => setScreen('scanner')}
+            onDelete={deleteSelectedLead}
           />
         )}
         {screen === 'leads' && (

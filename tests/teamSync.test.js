@@ -20,8 +20,11 @@ describe('team sync mapping', () => {
     eventName: 'LiGHT 26 London',
     eventLocation: 'Stand H40',
     rawScan: 'BEGIN:VCARD…',
+    consent: true,
+    consentAt: Date.UTC(2026, 8, 24, 9, 1),
     capturedAt: Date.UTC(2026, 8, 24, 9, 0),
     updatedAt: Date.UTC(2026, 8, 24, 9, 5),
+    deletedAt: null,
     status: 'queued',
   };
 
@@ -35,6 +38,26 @@ describe('team sync mapping', () => {
     const sent = toRemote(legacy);
     expect(sent.updatedAt).toBe(lead.capturedAt);
     expect(sent.eventName).toBe('Booth 7');
+  });
+
+  it('sends a deletion as a tombstone', () => {
+    const sent = toRemote({ id: lead.id, capturedAt: lead.capturedAt, deletedAt: 1, updatedAt: 1 });
+    expect(sent).toMatchObject({ id: lead.id, deletedAt: 1, consent: false, consentAt: null });
+  });
+
+  it('reads a deleted row as deleted', () => {
+    const row = {
+      id: lead.id,
+      badge_id: '',
+      name: '',
+      interests: [],
+      consent: false,
+      consent_at: null,
+      captured_at: '2026-09-24T09:00:00+00:00',
+      updated_at: '2026-09-24T10:00:00+00:00',
+      deleted_at: '2026-09-24T10:00:00+00:00',
+    };
+    expect(fromRemote(row)).toMatchObject({ deletedAt: Date.UTC(2026, 8, 24, 10), consent: false });
   });
 
   it('reads a database row back into the same lead', () => {
@@ -56,6 +79,9 @@ describe('team sync mapping', () => {
       event_name: lead.eventName,
       event_location: lead.eventLocation,
       raw_scan: lead.rawScan,
+      consent: true,
+      consent_at: '2026-09-24T09:01:00+00:00',
+      deleted_at: null,
       captured_at: '2026-09-24T09:00:00+00:00',
       updated_at: '2026-09-24T09:05:00+00:00',
       received_at: '2026-09-24T09:05:01.123456+00:00',

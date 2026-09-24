@@ -10,17 +10,24 @@ describe('CSV export', () => {
         interests: ['Sports', 'Industry'],
         action: 'Quotation',
         notes: 'line 1\nline 2',
+        consent: true,
+        consentAt: Date.UTC(2026, 8, 24, 10, 1),
         capturedAt: Date.UTC(2026, 8, 24, 10, 0),
       },
+      { name: 'No Consent', interests: [], consent: false, consentAt: Date.UTC(2026, 8, 24) },
     ]);
     const [header, row] = csv.split('\r\n');
-    expect(header.split(',')).toHaveLength(16);
+    expect(header.split(',')).toHaveLength(18);
+    expect(header).toContain('Consent to contact,Consent recorded at');
     expect(header.startsWith('Name,Job title,Company')).toBe(true);
     expect(row).toContain('"Jo ""JJ"" Smith"');
     expect(row).toContain('"Acme, Inc."');
     expect(row).toContain('Sports; Industry');
     expect(csv).toContain('"line 1\nline 2"');
     expect(row).toContain('2026-09-24T10:00:00.000Z');
+    expect(row).toContain('Yes,2026-09-24T10:01:00.000Z');
+    // A consent time is only exported with an actual consent.
+    expect(csv.split('\r\n').at(-1)).toContain(',No,,');
   });
 
   it('builds file names from the event label', () => {
