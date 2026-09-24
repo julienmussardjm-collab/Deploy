@@ -46,6 +46,17 @@ npm test
 npm run build
 ```
 
+## Deployment
+
+Vercel project `deploy` (team `julienmussardjm-5546s-projects`), linked to
+this repository:
+
+- Push to `main` → production (https://deploy-self-tau.vercel.app).
+- Push to any other branch → preview deployment with its own URL.
+- Build settings are pinned in `vercel.json` (Vite, output `dist`).
+- Roll back from Vercel → Deployments → a previous production build →
+  "Promote".
+
 ## Team database (Supabase)
 
 Leads are stored on the phone first (IndexedDB), then uploaded to a shared
