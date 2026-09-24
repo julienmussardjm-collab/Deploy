@@ -4,7 +4,10 @@ Mobile web app for capturing leads at trade shows: scan an attendee's badge
 QR code, qualify the lead (areas of interest, follow-up action, priority,
 notes), and export the list as CSV.
 
-Production: https://deploy-self-tau.vercel.app (Vercel project `deploy`).
+Production: https://deploy-self-tau.vercel.app (Vercel project `deploy`,
+deployed from the `main` branch). The Meeting Recorder app that previously
+lived in this repository is kept on the `claude/meeting-recorder-app-h7CTM`
+branch.
 
 ## Where this code comes from
 
