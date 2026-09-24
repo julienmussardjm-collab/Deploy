@@ -5,6 +5,7 @@
 // - Page loads: network first (to pick up new releases), falling back to
 //   the cached page after NAV_TIMEOUT_MS or when offline.
 // - /assets/*: content-hashed by Vite, so cache first.
+// - Icon and manifest: cached copy, refreshed in the background.
 // - Everything else (API, Supabase, other origins) is left to the network.
 
 const CACHE = 'lead-scanner-shell-v1';
@@ -75,6 +76,20 @@ async function handleAsset(request) {
   return response;
 }
 
+// Icon and manifest keep their name across releases: serve the cached copy
+// and refresh it in the background.
+async function handleShellFile(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  const refresh = fetch(request)
+    .then((response) => {
+      if (response.ok) cache.put(request, response.clone());
+      return response;
+    })
+    .catch(() => cached);
+  return cached || refresh;
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -83,7 +98,9 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request));
-  } else if (url.pathname.startsWith('/assets/') || SHELL.includes(url.pathname)) {
+  } else if (url.pathname.startsWith('/assets/')) {
     event.respondWith(handleAsset(request));
+  } else if (SHELL.includes(url.pathname)) {
+    event.respondWith(handleShellFile(request));
   }
 });
