@@ -131,21 +131,31 @@ async function pullTeam(code) {
 }
 
 // Uploads this phone's pending changes, then fetches the team's.
-// Only one sync runs at a time; concurrent callers share it.
+// Only one sync runs at a time. A call made while one is running (for
+// instance a save during a background sync) makes it do one more pass
+// right after, so the new change goes out without waiting for the timer.
 let running = null;
+let again = false;
 
 export function syncNow(code) {
   if (!code) return Promise.reject(new InvalidTeamCodeError());
-  if (!running) {
-    running = (async () => {
-      try {
+  if (running) {
+    again = true;
+    return running;
+  }
+  running = (async () => {
+    try {
+      let result;
+      do {
+        again = false;
         const pushed = await pushQueued(code);
         const pulled = await pullTeam(code);
-        return { pushed, pulled, at: Date.now() };
-      } finally {
-        running = null;
-      }
-    })();
-  }
+        result = { pushed, pulled, at: Date.now() };
+      } while (again);
+      return result;
+    } finally {
+      running = null;
+    }
+  })();
   return running;
 }

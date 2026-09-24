@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { UpdateBanner } from './components/UpdateBanner.jsx';
 import { useCamera } from './hooks/useCamera.js';
+import { useUpdateAvailable } from './hooks/useUpdateAvailable.js';
 import { parseBadge } from './lib/badgeParser.js';
 import { exportLeads } from './lib/csvExport.js';
 import {
@@ -68,6 +70,7 @@ export function App() {
   const [isRescan, setIsRescan] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const readTimerRef = useRef(null);
+  const updateAvailable = useUpdateAvailable();
 
   const userName = currentUser?.name;
   useEffect(() => {
@@ -262,6 +265,7 @@ export function App() {
     return (
       <div className="app-shell">
         <div className="app-frame">
+          {updateAvailable && <UpdateBanner />}
           <IdentityScreen
             teamCode={teamCode}
             teamCodeRejected={teamCodeRejected}
@@ -280,6 +284,8 @@ export function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
+        {/* Not over the form, so a reload never drops a lead being entered. */}
+        {updateAvailable && screen !== 'form' && <UpdateBanner />}
         {screen === 'scanner' && (
           <ScannerScreen
             eventLabel={currentEvent.name}
