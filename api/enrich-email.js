@@ -130,6 +130,8 @@ export function companySlug(company) {
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .filter((word) => !LEGAL_SUFFIXES.includes(word));
+  // "GmbH & Co. KG": once the suffixes are gone, the "&" is left dangling.
+  while (words[words.length - 1] === 'and') words.pop();
   return words.join('');
 }
 

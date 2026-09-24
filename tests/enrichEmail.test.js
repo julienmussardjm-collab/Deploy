@@ -4,6 +4,8 @@ import { candidateDomains, companySlug, guessEmails } from '../api/enrich-email.
 describe('enrich-email helpers', () => {
   it('drops legal suffixes and accents from company names', () => {
     expect(companySlug('Müller Licht GmbH')).toBe('mullerlicht');
+    expect(companySlug('Müller Licht GmbH & Co. KG')).toBe('mullerlicht');
+    expect(companySlug('Marks & Spencer')).toBe('marksandspencer');
     expect(companySlug('Lumen B.V.')).toBe('lumenbv');
     expect(companySlug('Lumen BV')).toBe('lumen');
   });
