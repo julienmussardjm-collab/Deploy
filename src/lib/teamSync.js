@@ -42,7 +42,7 @@ export async function checkTeamCode(code) {
   return rpc('team_code_ok', { p_code: code });
 }
 
-function toRemote(lead) {
+export function toRemote(lead) {
   return {
     id: lead.id,
     badgeId: lead.badgeId,
